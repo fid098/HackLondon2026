@@ -338,16 +338,18 @@ export default function Heatmap() {
   return (
     <div className="relative max-w-7xl mx-auto px-5 py-14">
 
-      {/* ── Background orbs (decorative blurred circles, see index.css .orb) ── */}
+      {/* ── Background shapes ── */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden>
-        <div className="orb orb-blue"   style={{ width: 600, height: 600, top: '-5%',  left: '-15%',  opacity: 0.07 }} />
-        <div className="orb orb-violet" style={{ width: 500, height: 500, bottom: '0', right: '-10%', opacity: 0.06 }} />
+        <div className="absolute rounded-full blur-3xl" style={{ width: 560, height: 560, top: '-8%', left: '-14%', background: 'radial-gradient(circle, rgba(239,68,68,0.2), transparent 70%)' }} />
+        <div className="absolute blur-3xl" style={{ width: 440, height: 280, bottom: '0', right: '-10%', borderRadius: '50% 50% 40% 60% / 60% 40% 60% 40%', background: 'radial-gradient(circle, rgba(185,28,28,0.18), transparent 70%)' }} />
+        <div className="absolute blur-2xl" style={{ width: 320, height: 200, top: '40%', left: '30%', borderRadius: '40% 60%', background: 'radial-gradient(circle, rgba(239,68,68,0.1), transparent 70%)' }} />
+        <div className="absolute rounded-full blur-3xl" style={{ width: 240, height: 240, top: '15%', right: '20%', background: 'radial-gradient(circle, rgba(220,38,38,0.12), transparent 70%)' }} />
       </div>
 
       {/* ── Page header ── */}
       <div className="mb-10 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-xs text-blue-400 uppercase tracking-[3px] font-semibold mb-2">
+          <p className="text-xs text-red-500 uppercase tracking-[3px] font-semibold mb-2">
             Live Data
           </p>
           <h1 className="text-4xl font-extrabold text-white mb-1">Misinformation Heatmap</h1>
@@ -359,12 +361,12 @@ export default function Heatmap() {
         {/* Live counter — updated by WebSocket delta messages */}
         <div
           className="flex items-center gap-3 px-5 py-3 rounded-xl"
-          style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)' }}
+          style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}
         >
-          <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse shrink-0" />
+          <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
           <div>
             <p className="text-2xl font-black text-white leading-none">{totalEvents.toLocaleString()}</p>
-            <p className="text-xs text-blue-400 mt-0.5">events tracked</p>
+            <p className="text-xs text-red-400 mt-0.5">events tracked</p>
           </div>
         </div>
       </div>
@@ -376,8 +378,8 @@ export default function Heatmap() {
         style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
       >
         <span
-          className="shrink-0 text-xs font-bold px-2 py-0.5 rounded-full text-blue-400"
-          style={{ background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.25)' }}
+          className="shrink-0 text-xs font-bold px-2 py-0.5 rounded-full text-red-400"
+          style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)' }}
         >
           LIVE
         </span>
@@ -395,8 +397,8 @@ export default function Heatmap() {
         ref={mapRef}           // ResizeObserver watches this div's width
         className="rounded-2xl overflow-hidden mb-8 relative"
         style={{
-          background: 'rgba(6,16,36,0.9)',
-          border:     '1px solid rgba(59,130,246,0.15)',
+          background: 'rgba(6,4,10,0.9)',
+          border:     '1px solid rgba(239,68,68,0.15)',
           height:     mapH || 336,
         }}
       >
@@ -408,8 +410,8 @@ export default function Heatmap() {
         >
           {[10, 20, 30, 40, 50, 60, 70, 80, 90].map((v) => (
             <g key={v}>
-              <line x1={`${v}%`} y1="0" x2={`${v}%`} y2="100%" stroke="#3b82f6" strokeWidth="0.5" />
-              <line x1="0" y1={`${v}%`} x2="100%" y2={`${v}%`} stroke="#3b82f6" strokeWidth="0.5" />
+              <line x1={`${v}%`} y1="0" x2={`${v}%`} y2="100%" stroke="rgba(239,68,68,0.4)" strokeWidth="0.5" />
+              <line x1="0" y1={`${v}%`} x2="100%" y2={`${v}%`} stroke="rgba(239,68,68,0.4)" strokeWidth="0.5" />
             </g>
           ))}
         </svg>
@@ -428,8 +430,8 @@ export default function Heatmap() {
               .replace(/(\d+(?:\.\d+)?),(\d+(?:\.\d+)?)/g, (_, x, y) =>
                 `${parseFloat(x) * scale},${parseFloat(y) * scale}`,
               )}
-            fill="rgba(59,130,246,0.06)"
-            stroke="rgba(59,130,246,0.2)"
+            fill="rgba(239,68,68,0.05)"
+            stroke="rgba(239,68,68,0.18)"
             strokeWidth="0.8"
           />
 
@@ -470,7 +472,7 @@ export default function Heatmap() {
                 className="text-xs px-3 py-1.5 rounded-full transition-all duration-150 font-medium focus:outline-none"
                 style={
                   category === c
-                    ? { background: 'rgba(59,130,246,0.15)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.35)' }
+                    ? { background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.35)' }
                     : { background: 'transparent', color: '#475569', border: '1px solid rgba(255,255,255,0.07)' }
                 }
               >
@@ -537,11 +539,6 @@ export default function Heatmap() {
         </div>
       </div>
 
-      {/* ── Data attribution note ── */}
-      <p className="text-center text-xs text-slate-700 mt-10 leading-relaxed">
-        Event data sourced from MongoDB Atlas geospatial aggregation · Updated via Change Streams every 30 s ·
-        Hotspot thresholds calibrated per-region to account for population density.
-      </p>
     </div>
   )
 }
