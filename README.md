@@ -12,14 +12,14 @@
 
 ## Stack
 
-| Layer      | Tech                                              |
-|------------|---------------------------------------------------|
-| Frontend   | React 18 + TypeScript + Vite + TailwindCSS        |
-| Backend    | FastAPI + Pydantic v2 + Motor (async MongoDB)     |
-| Database   | MongoDB Atlas (Vector Search, Geospatial, Streams)|
-| AI         | Gemini 1.5 Pro (deep analysis) + Flash (triage)   |
-| Extension  | Chrome MV3 + Vite + TypeScript                    |
-| Deploy     | Vultr + Docker Compose + Nginx                    |
+| Layer     | Tech                                               |
+| --------- | -------------------------------------------------- |
+| Frontend  | React 18 + TypeScript + Vite + TailwindCSS         |
+| Backend   | FastAPI + Pydantic v2 + Motor (async MongoDB)      |
+| Database  | MongoDB Atlas (Vector Search, Geospatial, Streams) |
+| AI        | Gemini 1.5 Pro (deep analysis) + Flash (triage)    |
+| Extension | Chrome MV3 + Vite + TypeScript                     |
+| Deploy    | Vultr + Docker Compose + Nginx                     |
 
 ## Quick Start (local dev)
 
