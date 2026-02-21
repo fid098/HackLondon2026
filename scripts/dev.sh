@@ -2,10 +2,10 @@
 # dev.sh — Start the TruthGuard development environment
 #
 # Usage:
-#   ./scripts/dev.sh           # Start all services
-#   ./scripts/dev.sh --build   # Rebuild Docker images first
-#   ./scripts/dev.sh api       # Start only the API + dependencies
-#   ./scripts/dev.sh --seed    # Start all + seed the database
+#   ./scripts/dev.sh              # Start all services
+#   ./scripts/dev.sh --build      # Rebuild Docker images first
+#   ./scripts/dev.sh backend      # Start only the backend API + dependencies
+#   ./scripts/dev.sh --seed       # Start all + seed the database
 
 set -euo pipefail
 
@@ -15,10 +15,10 @@ ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$ROOT_DIR"
 
 # ─── Ensure env files exist ───────────────────────────────────────────────────
-if [ ! -f "apps/api/.env" ]; then
-    echo "Creating apps/api/.env from .env.example..."
-    cp apps/api/.env.example apps/api/.env
-    echo "  → Edit apps/api/.env to add real API keys (or leave AI_MOCK_MODE=true)"
+if [ ! -f "apps/backend/.env" ]; then
+    echo "Creating apps/backend/.env from .env.example..."
+    cp apps/backend/.env.example apps/backend/.env
+    echo "  → Edit apps/backend/.env to add real API keys (or leave AI_MOCK_MODE=true)"
 fi
 
 # ─── Parse arguments ─────────────────────────────────────────────────────────
@@ -30,16 +30,16 @@ for arg in "$@"; do
     case $arg in
         --build) BUILD_FLAG="--build" ;;
         --seed)  SEED=true ;;
-        api|web|mongo) SERVICE="$arg" ;;
+        backend|frontend|mongo) SERVICE="$arg" ;;
     esac
 done
 
 # ─── Start services ───────────────────────────────────────────────────────────
 echo "Starting TruthGuard dev environment..."
-echo "  Web:  http://localhost:5173"
-echo "  API:  http://localhost:8000"
-echo "  Docs: http://localhost:8000/docs"
-echo "  Mongo: localhost:27017"
+echo "  Frontend:  http://localhost:5173"
+echo "  Backend:   http://localhost:8000"
+echo "  API Docs:  http://localhost:8000/docs"
+echo "  Mongo:     localhost:27017"
 echo ""
 
 if [ -n "$SERVICE" ]; then
