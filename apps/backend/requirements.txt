@@ -26,6 +26,11 @@ python-multipart==0.0.9
 # ─── Utilities ────────────────────────────────────────────────────
 python-dotenv==1.0.1
 
+# ─── Article / HTML extraction ────────────────────────────────────
+beautifulsoup4==4.12.3    # HTML parsing for article content extraction
+lxml==5.2.2               # Fast BS4 parser backend
+youtube-transcript-api==0.6.2  # YouTube transcript fetching (optional)
+
 # ─── Google AI (lazy-imported in real mode only) ──────────────────
 google-generativeai==0.7.2
 

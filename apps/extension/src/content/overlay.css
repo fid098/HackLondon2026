@@ -37,6 +37,32 @@
 .tg-verdict-unverified { background: rgba(99,102,241,0.15);  color: #6366f1; border: 1px solid rgba(99,102,241,0.35);  }
 .tg-verdict-true       { background: rgba(16,185,129,0.15);  color: #10b981; border: 1px solid rgba(16,185,129,0.35);  }
 
+/* Video deepfake warning badge (non-disruptive overlay). */
+.tg-video-container {
+  position: relative;
+}
+
+.tg-video-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 9999;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+
+.tg-video-badge-risk {
+  color: #fff1f2;
+  background: rgba(185, 28, 28, 0.88);
+  border: 1px solid rgba(239, 68, 68, 0.85);
+  box-shadow: 0 6px 16px rgba(127, 29, 29, 0.5);
+}
+
 /* ── Selection "Analyze" tooltip ─────────────────────────────────────────────── */
 
 .tg-tooltip {

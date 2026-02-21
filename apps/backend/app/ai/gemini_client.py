@@ -25,8 +25,8 @@ logger = logging.getLogger(__name__)
 
 
 class GeminiModel(str, Enum):
-    PRO = "gemini-1.5-pro"
-    FLASH = "gemini-1.5-flash"
+    PRO = "gemini-2.5-flash"
+    FLASH = "gemini-2.5-flash"
 
 
 # Canned responses for mock mode.
@@ -101,6 +101,48 @@ _MOCK_RESPONSES: dict[str, str] = {
         '{"verdict": "UNVERIFIED", "confidence": 30, '
         '"summary": "[MOCK] Quick triage complete — no real analysis in mock mode."}'
     ),
+    "quick_triage_youtube": (
+        '{"verdict": "MISLEADING", "confidence": 74, '
+        '"summary": "This YouTube video contains selectively edited footage that omits '
+        'key context. The speaker\'s statements are technically accurate in isolation '
+        'but the cuts create a false impression of the overall argument."}'
+    ),
+    "quick_triage_tiktok": (
+        '{"verdict": "FALSE", "confidence": 81, '
+        '"summary": "This TikTok clip makes a health claim that contradicts established '
+        'medical consensus. The statistic quoted has been debunked by the WHO and '
+        'multiple peer-reviewed studies since 2022."}'
+    ),
+    "quick_triage_twitter": (
+        '{"verdict": "MISLEADING", "confidence": 68, '
+        '"summary": "This post on X / Twitter shares a real statistic stripped of its '
+        'original context. The figure applies to a narrow sub-group but is presented '
+        'as a general fact, significantly overstating the claim."}'
+    ),
+    "quick_triage_instagram": (
+        '{"verdict": "UNVERIFIED", "confidence": 45, '
+        '"summary": "This Instagram post makes claims that could not be traced to a '
+        'primary source. The image metadata and reverse-image search return no credible '
+        'origin — treat with caution until a reliable source is found."}'
+    ),
+    "quick_triage_article": (
+        '{"verdict": "TRUE", "confidence": 88, '
+        '"summary": "The core claims in this article are well-supported by cited sources. '
+        'Three independent fact-checkers have verified the primary statistics and the '
+        'publication has a strong editorial track record."}'
+    ),
+    "quick_triage_reddit": (
+        '{"verdict": "MISLEADING", "confidence": 61, '
+        '"summary": "This Reddit post mixes accurate background information with an '
+        'unsupported conclusion. The linked study does not support the headline claim '
+        'made in the post title."}'
+    ),
+    "quick_triage_facebook": (
+        '{"verdict": "FALSE", "confidence": 77, '
+        '"summary": "This Facebook post is a known piece of viral misinformation. '
+        'The claim has been debunked by AP Fact Check, Snopes, and PolitiFact. '
+        'The original image was taken at a different event in a different year."}'
+    ),
     "scam_check": (
         '{"is_scam": false, "confidence": 0.15, '
         '"model_scores": {"roberta": 0.12, "xgboost": 0.18}, '
@@ -139,7 +181,7 @@ class GeminiClient:
         if self.mock_mode:
             logger.info("GeminiClient initialised in MOCK mode")
         else:
-            logger.info("GeminiClient initialised in REAL mode (model: gemini-1.5-*)")
+            logger.info("GeminiClient initialised in REAL mode (model: gemini-2.5-flash)")
 
     async def generate(
         self,

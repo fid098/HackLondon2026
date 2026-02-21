@@ -47,12 +47,50 @@ interface Settings {
   enabled: boolean
   sensitivity: Sensitivity
   apiBase: string
+  redFlagEnabled: boolean
+  meetingModeEnabled: boolean
 }
 
 interface TriageResult {
   verdict: string
   confidence: number
   summary: string
+}
+
+interface VideoFramePayload {
+  platform: string
+  videoUrl: string
+  timestampMs: number
+  frameB64: string
+}
+
+interface DeepfakeFrameResult {
+  label: 'REAL' | 'SUSPECTED_FAKE' | 'UNVERIFIED'
+  confidence: number
+  deepfakeScore: number
+  explainability: string
+}
+
+interface VideoFlagPayload {
+  sourceUrl: string
+  platform: string
+  category?: string
+  reason?: string
+  confidence?: number
+  location?: {
+    lat: number
+    lng: number
+  } | null
+}
+
+interface VideoFlagResult {
+  ok: boolean
+  id: string | null
+  event?: {
+    label: string
+    category: string
+    severity: string
+  }
 }
 
 // ── Default settings ────────────────────────────────────────────────────────────
@@ -63,6 +101,8 @@ const DEFAULT_SETTINGS: Settings = {
   enabled: true,
   sensitivity: 'medium',
   apiBase: 'http://localhost:8000',  // change to production URL for deployment
+  redFlagEnabled: true,
+  meetingModeEnabled: false,
 }
 
 // ── Install / update handler ────────────────────────────────────────────────────
@@ -137,6 +177,22 @@ chrome.runtime.onMessage.addListener(
       return true   // ← KEEP THIS: tells Chrome to wait for the async sendResponse call
     }
 
+    if (message.type === 'ANALYZE_VIDEO_FRAME') {
+      const payload = message.payload as VideoFramePayload
+      analyzeVideoFrame(payload)
+        .then((result) => sendResponse({ ok: true, data: result }))
+        .catch((err: Error) => sendResponse({ ok: false, error: err.message }))
+      return true
+    }
+
+    if (message.type === 'FLAG_VIDEO') {
+      const payload = message.payload as VideoFlagPayload
+      submitVideoFlag(payload)
+        .then((result) => sendResponse({ ok: true, data: result }))
+        .catch((err: Error) => sendResponse({ ok: false, error: err.message }))
+      return true
+    }
+
     if (message.type === 'GET_SETTINGS') {
       // chrome.storage.sync.get() is async — that's why return true is needed here too
       chrome.storage.sync.get(DEFAULT_SETTINGS, (s) =>
@@ -183,10 +239,113 @@ async function analyzeViaAPI(text: string): Promise<TriageResult> {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify({ text }),
+    signal:  AbortSignal.timeout(15000),
   })
 
   if (!res.ok) throw new Error(`API error ${res.status}`)
   return res.json()
+}
+
+/**
+ * Runs quick deepfake analysis on a sampled video frame.
+ *
+ * Phase 1 implementation:
+ * - Content script samples visible video frames as JPEG base64
+ * - Background proxies to backend image endpoint
+ * - Backend returns is_deepfake/confidence/reasoning
+ * - We normalize into a video-friendly result shape
+ */
+async function analyzeVideoFrame(payload: VideoFramePayload): Promise<DeepfakeFrameResult> {
+  const settings = await getSettings()
+
+  if (!settings.enabled || !settings.redFlagEnabled) {
+    return {
+      label: 'UNVERIFIED',
+      confidence: 0,
+      deepfakeScore: 0,
+      explainability: 'Red-Flag background protection is disabled.',
+    }
+  }
+
+  if (!payload.frameB64) {
+    throw new Error('Missing frame payload.')
+  }
+
+  // 10 s timeout: if the backend doesn't respond, the pending-video lock in the
+  // content script would otherwise never be released for that video element.
+  const res = await fetch(`${settings.apiBase}/api/v1/deepfake/image`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      image_b64: payload.frameB64,
+      filename: `${payload.platform || 'video'}-frame.jpg`,
+    }),
+    signal: AbortSignal.timeout(10000),
+  })
+
+  if (!res.ok) {
+    throw new Error(`Deepfake API error ${res.status}`)
+  }
+
+  const data = await res.json() as {
+    is_deepfake?: boolean
+    confidence?: number
+    reasoning?: string
+  }
+
+  const normalizedScore = Math.max(0, Math.min(1, Number(data.confidence ?? 0)))
+  const scorePercent = Math.round(normalizedScore * 100)
+
+  return {
+    label: data.is_deepfake ? 'SUSPECTED_FAKE' : 'REAL',
+    confidence: scorePercent,
+    deepfakeScore: scorePercent,
+    explainability: data.reasoning ?? 'Frame analysis complete.',
+  }
+}
+
+/**
+ * Save a user-submitted suspected-AI video flag for heatmap aggregation.
+ */
+async function submitVideoFlag(payload: VideoFlagPayload): Promise<VideoFlagResult> {
+  const settings = await getSettings()
+
+  if (!payload.sourceUrl?.trim()) {
+    throw new Error('Missing source URL for flagged content.')
+  }
+
+  const res = await fetch(`${settings.apiBase}/api/v1/heatmap/flags`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      source_url: payload.sourceUrl,
+      platform: payload.platform || 'web',
+      category: payload.category ?? 'Deepfake',
+      reason: payload.reason ?? 'user_suspected_ai_video',
+      confidence: payload.confidence ?? null,
+      location: payload.location ?? null,
+    }),
+  })
+
+  if (!res.ok) {
+    throw new Error(`Heatmap flag API error ${res.status}`)
+  }
+
+  const data = await res.json() as {
+    ok?: boolean
+    id?: string | null
+    event?: { label?: string; category?: string; severity?: string }
+  }
+
+  return {
+    ok: Boolean(data.ok),
+    id: data.id ?? null,
+    event: data.event ? {
+      label: data.event.label ?? 'Unknown',
+      category: data.event.category ?? 'Deepfake',
+      severity: data.event.severity ?? 'medium',
+    } : undefined,
+  }
 }
 
 // ── Toolbar badge counter ───────────────────────────────────────────────────────
