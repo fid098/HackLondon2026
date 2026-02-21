@@ -1,0 +1,59 @@
+{
+  "manifest_version": 3,
+  "name": "TruthGuard",
+  "version": "0.1.0",
+  "description": "Detect misinformation and deepfakes on social media. Highlight text to analyze with AI.",
+
+  "permissions": [
+    "activeTab",
+    "storage",
+    "contextMenus"
+  ],
+
+  "host_permissions": [
+    "https://*/*",
+    "http://localhost/*"
+  ],
+
+  "background": {
+    "service_worker": "background/index.js",
+    "type": "module"
+  },
+
+  "content_scripts": [
+    {
+      "matches": [
+        "https://x.com/*",
+        "https://twitter.com/*",
+        "https://www.instagram.com/*",
+        "https://www.facebook.com/*"
+      ],
+      "js": ["content/index.js"],
+      "css": ["content/overlay.css"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "action": {
+    "default_popup": "popup/index.html",
+    "default_title": "TruthGuard",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+
+  "web_accessible_resources": [
+    {
+      "resources": ["content/overlay.css"],
+      "matches": ["https://*/*"]
+    }
+  ]
+}

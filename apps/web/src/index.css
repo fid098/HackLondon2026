@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Dark theme base — all pages inherit this */
+  html {
+    @apply bg-gray-950 text-gray-100;
+  }
+
+  body {
+    @apply antialiased;
+    font-family: Inter, system-ui, sans-serif;
+  }
+
+  /* Scrollbar styling for dark theme */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-gray-900;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-700 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-600;
+  }
+}
+
+@layer components {
+  /* Reusable card style */
+  .card {
+    @apply bg-gray-800 border border-gray-700 rounded-xl p-6;
+  }
+
+  /* Primary button */
+  .btn-primary {
+    @apply px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white font-medium
+           rounded-lg transition-colors duration-150 focus:outline-none
+           focus:ring-2 focus:ring-brand-500 focus:ring-offset-2
+           focus:ring-offset-gray-950;
+  }
+
+  /* Secondary button */
+  .btn-secondary {
+    @apply px-5 py-2.5 bg-gray-700 hover:bg-gray-600 text-white font-medium
+           rounded-lg transition-colors duration-150 focus:outline-none
+           focus:ring-2 focus:ring-gray-500 focus:ring-offset-2
+           focus:ring-offset-gray-950;
+  }
+}

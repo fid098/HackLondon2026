@@ -1,0 +1,64 @@
+# ─── Dependencies ───────────────────────────────────────────────
+node_modules/
+.pnp
+.pnp.js
+
+# ─── Build outputs ───────────────────────────────────────────────
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# ─── Python ──────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+.eggs/
+.mypy_cache/
+.ruff_cache/
+
+# ─── Environment / secrets ────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+apps/api/.env
+apps/web/.env.local
+# Keep .env.example files tracked
+!.env.example
+!apps/api/.env.example
+!apps/web/.env.example
+
+# ─── IDE ─────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ─── Logs ────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ─── Test / coverage ─────────────────────────────────────────────
+coverage/
+.coverage
+htmlcov/
+.pytest_cache/
+.vitest/
+junit*.xml
+
+# ─── Docker local data ───────────────────────────────────────────
+mongo_data/
+
+# ─── Misc ────────────────────────────────────────────────────────
+*.tar
+*.gz
