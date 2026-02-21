@@ -14,6 +14,7 @@
 import { useEffect, useState } from 'react'
 import AuthModal from './components/AuthModal'
 import Navbar from './components/Navbar'
+import Deepfake from './pages/Deepfake'
 import FactCheck from './pages/FactCheck'
 import Heatmap from './pages/Heatmap'
 import Landing from './pages/Landing'
@@ -25,6 +26,7 @@ const PAGES = {
   factcheck: FactCheck,
   heatmap:   Heatmap,
   reports:   Reports,
+  deepfake:  Deepfake,
 }
 
 export default function App() {

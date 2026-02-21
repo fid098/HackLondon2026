@@ -19,6 +19,7 @@ const NAV_ITEMS = [
   { id: 'factcheck', label: 'Fact Check' },
   { id: 'heatmap',   label: 'Heatmap'    },
   { id: 'reports',   label: 'Reports'    },
+  { id: 'deepfake',  label: 'Deepfake'   },
 ]
 
 export default function Navbar({ currentPage, onNavigate, user, onLogin, onLogout }) {

@@ -175,3 +175,32 @@ export function openHeatmapStream(onMessage) {
   }
   return ws
 }
+
+/* ─── deepfake detection ──────────────────────────────────────────────────────── */
+
+/**
+ * Analyse a base64-encoded image for deepfake manipulation.
+ * @param {{ image_b64: string, filename?: string }} payload
+ * @returns {Promise<{ is_deepfake: boolean, confidence: number, reasoning: string }>}
+ */
+export async function analyzeDeepfakeImage(payload) {
+  return post('/api/v1/deepfake/image', payload)
+}
+
+/**
+ * Analyse base64-encoded audio for synthetic speech / voice cloning.
+ * @param {{ audio_b64: string, filename?: string }} payload
+ * @returns {Promise<{ is_synthetic: boolean, confidence: number, reasoning: string }>}
+ */
+export async function analyzeDeepfakeAudio(payload) {
+  return post('/api/v1/deepfake/audio', payload)
+}
+
+/**
+ * Analyse base64-encoded video for deepfake manipulation.
+ * @param {{ video_b64: string, filename?: string }} payload
+ * @returns {Promise<{ is_deepfake: boolean, confidence: number, reasoning: string }>}
+ */
+export async function analyzeDeepfakeVideo(payload) {
+  return post('/api/v1/deepfake/video', payload)
+}

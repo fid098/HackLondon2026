@@ -24,18 +24,24 @@ describe('Navbar', () => {
     expect(screen.getByText('TruthGuard')).toBeInTheDocument()
   })
 
-  it('renders exactly 3 nav items: Fact Check, Heatmap, Reports', () => {
+  it('renders 4 nav items: Fact Check, Heatmap, Reports, Deepfake', () => {
     setup()
     expect(screen.getByText('Fact Check')).toBeInTheDocument()
     expect(screen.getByText('Heatmap')).toBeInTheDocument()
     expect(screen.getByText('Reports')).toBeInTheDocument()
+    expect(screen.getByText('Deepfake')).toBeInTheDocument()
   })
 
-  it('does not render Settings, Scam Check or Deepfake nav items', () => {
+  it('does not render Settings or Scam Check nav items', () => {
     setup()
     expect(screen.queryByText(/settings/i)).toBeNull()
     expect(screen.queryByText(/scam/i)).toBeNull()
-    expect(screen.queryByText(/deepfake/i)).toBeNull()
+  })
+
+  it('calls onNavigate("deepfake") when Deepfake is clicked', () => {
+    const { onNavigate } = setup()
+    fireEvent.click(screen.getByText('Deepfake'))
+    expect(onNavigate).toHaveBeenCalledWith('deepfake')
   })
 
   it('calls onNavigate("home") when the logo is clicked', () => {
