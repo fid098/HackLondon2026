@@ -23,10 +23,11 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from bson import ObjectId
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
 from app.ai.gemini_client import gemini_client
 from app.core.database import get_db
+from app.core.rate_limit import limiter
 from app.models.scam import (
     FeedbackRequest,
     FeedbackResponse,
@@ -81,7 +82,8 @@ def _parse_scam_json(raw: str) -> Optional[dict]:
 # ── POST /api/v1/scam/check ────────────────────────────────────────────────────
 
 @router.post("/api/v1/scam/check", response_model=ScamCheckResponse, status_code=200)
-async def check_scam(payload: ScamCheckRequest):
+@limiter.limit("30/minute")
+async def check_scam(request: Request, payload: ScamCheckRequest):
     """
     Analyse text for scam / phishing indicators.
 

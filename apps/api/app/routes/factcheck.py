@@ -16,11 +16,12 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.ai.debate_pipeline import debate_pipeline
 from app.core.database import get_db
+from app.core.rate_limit import limiter
 from app.models.report import (
     DebateArtifact,
     FactCheckRequest,
@@ -51,7 +52,9 @@ def _optional_user_id(
 # ── Route ─────────────────────────────────────────────────────────────────────
 
 @router.post("/factcheck", response_model=FactCheckResponse, status_code=201)
+@limiter.limit("20/minute")
 async def factcheck(
+    request: Request,
     payload: FactCheckRequest,
     db=Depends(get_db),
     user_id: Optional[str] = Depends(_optional_user_id),

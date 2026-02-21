@@ -34,5 +34,8 @@ pytest==8.3.2
 pytest-asyncio==0.23.8
 anyio[trio]==4.4.0     # Async test backend
 
+# ─── Rate limiting (Phase 7) ──────────────────────────────────────
+slowapi==0.1.9            # Starlette/FastAPI rate limiting (wraps limits library)
+
 # ─── Linting / formatting ─────────────────────────────────────────
 ruff==0.5.5

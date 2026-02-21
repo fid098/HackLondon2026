@@ -20,10 +20,10 @@ import json
 import logging
 import re
 
-from fastapi import APIRouter
-from pydantic import BaseModel
+from fastapi import APIRouter, Request
 
 from app.ai.gemini_client import gemini_client
+from app.core.rate_limit import limiter
 from app.models.deepfake import (
     DeepfakeAudioRequest,
     DeepfakeAudioResponse,
@@ -105,7 +105,8 @@ def _clamp_confidence(value: float) -> float:
 # ── Endpoints ──────────────────────────────────────────────────────────────────
 
 @router.post("/image", response_model=DeepfakeImageResponse, status_code=200)
-async def analyze_image(payload: DeepfakeImageRequest):
+@limiter.limit("20/minute")
+async def analyze_image(request: Request, payload: DeepfakeImageRequest):
     """
     Analyse a base64-encoded image for deepfake manipulation.
 
@@ -134,7 +135,8 @@ async def analyze_image(payload: DeepfakeImageRequest):
 
 
 @router.post("/audio", response_model=DeepfakeAudioResponse, status_code=200)
-async def analyze_audio(payload: DeepfakeAudioRequest):
+@limiter.limit("20/minute")
+async def analyze_audio(request: Request, payload: DeepfakeAudioRequest):
     """
     Analyse base64-encoded audio for synthetic speech / voice cloning.
 
@@ -163,7 +165,8 @@ async def analyze_audio(payload: DeepfakeAudioRequest):
 
 
 @router.post("/video", response_model=DeepfakeVideoResponse, status_code=200)
-async def analyze_video(payload: DeepfakeVideoRequest):
+@limiter.limit("20/minute")
+async def analyze_video(request: Request, payload: DeepfakeVideoRequest):
     """
     Analyse base64-encoded video for deepfake manipulation.
 

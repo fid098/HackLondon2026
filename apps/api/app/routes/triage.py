@@ -13,10 +13,11 @@ import json
 import logging
 import re
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
 from app.ai.gemini_client import gemini_client
+from app.core.rate_limit import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +48,8 @@ class TriageResponse(BaseModel):
 
 
 @router.post("", response_model=TriageResponse, status_code=200)
-async def quick_triage(payload: TriageRequest):
+@limiter.limit("60/minute")
+async def quick_triage(request: Request, payload: TriageRequest):
     """
     Fast single-model fact-check using Gemini Flash.
 

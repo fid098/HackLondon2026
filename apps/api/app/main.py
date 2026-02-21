@@ -15,9 +15,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from app.core.config import settings
 from app.core.database import close_mongo_connection, connect_to_mongo
+from app.core.rate_limit import limiter
 from app.routes.auth import router as auth_router
 from app.routes.deepfake import router as deepfake_router
 from app.routes.factcheck import router as factcheck_router
@@ -66,6 +69,12 @@ app = FastAPI(
     redoc_url="/redoc" if settings.environment != "production" else None,
 )
 
+
+# ─── Rate limiting (Phase 7) ───────────────────────────────────────────────────
+# Attach the limiter to app state so slowapi can find it.
+# Routes opt-in with @limiter.limit("N/minute") + request: Request parameter.
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # ─── Middleware ─────────────────────────────────────────────────────────────────
 # CORS: allow the web app and Chrome extension to call the API.
