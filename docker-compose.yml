@@ -1,0 +1,99 @@
+# docker-compose.yml — Local development environment
+#
+# Runs: MongoDB + FastAPI backend + React web app
+# All services communicate over the 'truthguard' bridge network.
+# Hot-reload is enabled for both api and web.
+#
+# Usage:
+#   docker compose up          # start everything
+#   docker compose up --build  # rebuild images first
+#   docker compose up api      # start just the API (+ dependencies)
+
+services:
+  # ─────────────────────────────────────────────
+  # MongoDB (local dev only — prod uses Atlas)
+  # ─────────────────────────────────────────────
+  mongo:
+    image: mongo:7
+    container_name: truthguard_mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: devpassword
+      MONGO_INITDB_DATABASE: truthguard
+    volumes:
+      - mongo_data:/data/db
+      - ./infra/mongo/init.js:/docker-entrypoint-initdb.d/init.js:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - truthguard
+
+  # ─────────────────────────────────────────────
+  # FastAPI Backend
+  # ─────────────────────────────────────────────
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+      target: development
+    container_name: truthguard_api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      ENVIRONMENT: development
+      MONGO_URI: mongodb://root:devpassword@mongo:27017/truthguard?authSource=admin
+      MONGO_DB_NAME: truthguard
+      AI_MOCK_MODE: "true"
+      CORS_ORIGINS_STR: "http://localhost:5173,http://localhost:3000"
+    env_file:
+      # Optional: override env vars locally (see apps/api/.env.example)
+      - path: ./apps/api/.env
+        required: false
+    depends_on:
+      mongo:
+        condition: service_healthy
+    volumes:
+      # Mount source for hot-reload; exclude __pycache__
+      - ./apps/api:/app
+      - /app/__pycache__
+    networks:
+      - truthguard
+
+  # ─────────────────────────────────────────────
+  # React Web App (Vite dev server)
+  # ─────────────────────────────────────────────
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+      target: development
+    container_name: truthguard_web
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://localhost:8000
+    volumes:
+      - ./apps/web:/app
+      # Preserve the container's node_modules (avoids host/container conflicts)
+      - web_node_modules:/app/node_modules
+    depends_on:
+      - api
+    networks:
+      - truthguard
+
+volumes:
+  mongo_data:
+  web_node_modules:
+
+networks:
+  truthguard:
+    driver: bridge

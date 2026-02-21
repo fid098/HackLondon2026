@@ -1,0 +1,82 @@
+# docker-compose.prod.yml — Production deployment template
+#
+# Differences from dev:
+#   - Uses pre-built images (no volume source mounts)
+#   - Nginx reverse proxy on port 80/443
+#   - No local MongoDB — uses Atlas (MONGO_URI in env)
+#   - Non-root containers, resource limits, restart policies
+#
+# Usage:
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# See docs/DEPLOY_VULTR.md for full deployment guide.
+
+services:
+  # ─────────────────────────────────────────────
+  # Nginx Reverse Proxy
+  # ─────────────────────────────────────────────
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: truthguard_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/nginx/nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
+      # Uncomment once TLS certs are provisioned (e.g., certbot):
+      # - ./infra/nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - api
+      - web
+    networks:
+      - truthguard_prod
+
+  # ─────────────────────────────────────────────
+  # FastAPI Backend
+  # ─────────────────────────────────────────────
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+      target: production
+    container_name: truthguard_api
+    restart: unless-stopped
+    expose:
+      - "8000"
+    environment:
+      ENVIRONMENT: production
+      AI_MOCK_MODE: "false"
+    env_file:
+      - ./apps/api/.env  # MUST exist in prod — contains Atlas URI, Gemini key, etc.
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    networks:
+      - truthguard_prod
+
+  # ─────────────────────────────────────────────
+  # React Web App (pre-built static files served by Nginx)
+  # ─────────────────────────────────────────────
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+      target: production
+    container_name: truthguard_web
+    restart: unless-stopped
+    expose:
+      - "80"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
+    networks:
+      - truthguard_prod
+
+networks:
+  truthguard_prod:
+    driver: bridge

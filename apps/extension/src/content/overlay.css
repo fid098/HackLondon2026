@@ -1,0 +1,31 @@
+/*
+ * overlay.css — Styles for TruthGuard content script injections.
+ *
+ * Phase 0: Empty placeholder.
+ * Phase 4 will add:
+ *   - .tg-badge — Small badge overlaid on flagged posts
+ *   - .tg-tooltip — "Analyze with TruthGuard" tooltip on selection
+ *   - .tg-highlight — Subtle highlight on flagged text
+ *
+ * Design principles:
+ *   - Non-disruptive: don't obscure content, small and subtle
+ *   - Consistent: matches TruthGuard brand (emerald on dark)
+ *   - Accessible: sufficient contrast ratios
+ */
+
+/* .tg-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  cursor: pointer;
+  margin-left: 6px;
+  vertical-align: middle;
+  white-space: nowrap;
+} */
