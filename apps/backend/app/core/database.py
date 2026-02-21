@@ -76,21 +76,18 @@ async def close_mongo_connection() -> None:
         logger.info("MongoDB connection closed")
 
 
-def get_db() -> AsyncIOMotorDatabase:
+def get_db() -> AsyncIOMotorDatabase | None:
     """
     FastAPI dependency — inject the database into route handlers.
 
-    Usage in a route:
-        from fastapi import Depends
-        from app.core.database import get_db
+    Returns None when MongoDB is unavailable so routes can degrade
+    gracefully (skip persistence) rather than returning 500 errors.
 
-        @router.get("/items")
-        async def list_items(db: AsyncIOMotorDatabase = Depends(get_db)):
-            return await db.items.find().to_list(100)
+    Usage in a route:
+        async def my_route(db = Depends(get_db)):
+            if db is not None:
+                await db.collection.insert_one(doc)
     """
-    if db_client.db is None:
-        # This will surface as a 500 — callers should handle it
-        raise RuntimeError("Database not connected. Was connect_to_mongo() called at startup?")
     return db_client.db
 
 

@@ -23,9 +23,11 @@ _YT_RE = re.compile(
     r"(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/shorts/)([A-Za-z0-9_-]{11})"
 )
 
-_TAG_RE  = re.compile(r"<[^>]+>")
-_WS_RE   = re.compile(r"\s{3,}")
-_MAX_LEN = 8_000
+_SCRIPT_RE = re.compile(r"<script[^>]*>.*?</script>", re.DOTALL | re.IGNORECASE)
+_STYLE_RE  = re.compile(r"<style[^>]*>.*?</style>",  re.DOTALL | re.IGNORECASE)
+_TAG_RE    = re.compile(r"<[^>]+>")
+_WS_RE     = re.compile(r"\s{3,}")
+_MAX_LEN   = 8_000
 
 
 def _is_youtube(url: str) -> bool:
@@ -33,7 +35,10 @@ def _is_youtube(url: str) -> bool:
 
 
 def _strip_html(html: str) -> str:
-    text = _TAG_RE.sub(" ", html)
+    # Remove script and style blocks first (including JSON-LD, inline JS, CSS)
+    text = _SCRIPT_RE.sub(" ", html)
+    text = _STYLE_RE.sub(" ", text)
+    text = _TAG_RE.sub(" ", text)
     text = _WS_RE.sub("\n\n", text)
     return text.strip()
 

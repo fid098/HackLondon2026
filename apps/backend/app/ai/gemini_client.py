@@ -25,8 +25,8 @@ logger = logging.getLogger(__name__)
 
 
 class GeminiModel(str, Enum):
-    PRO = "gemini-1.5-pro"
-    FLASH = "gemini-1.5-flash"
+    PRO = "gemini-2.5-flash"
+    FLASH = "gemini-2.5-flash"
 
 
 # Canned responses for mock mode.
@@ -56,7 +56,10 @@ _MOCK_RESPONSES: dict[str, str] = {
     # agent_pro / agent_con are the keys used by debate_pipeline.py
     "agent_pro": (
         "ARGUMENT: Based on available evidence, there is credible support for this claim. "
-        "Peer-reviewed literature and expert statements align with the core assertion.\n"
+        "According to [Reuters Fact Check](https://www.reuters.com/fact-check/) peer-reviewed "
+        "literature and expert statements align with the core assertion. "
+        "The [WHO](https://www.who.int/news/) has also published data consistent with this "
+        "position, and the underlying methodology has been validated by multiple independent institutions.\n"
         "POINTS:\n"
         "- The underlying data point exists in peer-reviewed literature.\n"
         "- Geographic scope of the claim is broadly correct.\n"
@@ -64,7 +67,11 @@ _MOCK_RESPONSES: dict[str, str] = {
     ),
     "agent_con": (
         "ARGUMENT: Counter-evidence indicates this claim contains significant inaccuracies "
-        "or omits crucial context that fundamentally alters its meaning.\n"
+        "or omits crucial context that fundamentally alters its meaning. "
+        "According to [AP Fact Check](https://apnews.com/hub/ap-fact-check) this narrative "
+        "has been investigated and found to be misleading. "
+        "[Snopes](https://www.snopes.com/) similarly concluded that the claim omits critical "
+        "context, and the data cited is over a decade old.\n"
         "POINTS:\n"
         "- The study cited predates the claim by over a decade — the landscape has changed.\n"
         "- The figure was cherry-picked; the same paper shows contrary trends in most cases.\n"
@@ -76,9 +83,14 @@ _MOCK_RESPONSES: dict[str, str] = {
         'context that significantly changes its meaning. The core statistic cited is real, '
         'but the source and timeframe have been misrepresented.", '
         '"category": "General", '
-        '"reasoning": "After reviewing both arguments and available fact-check data, '
-        'the claim merits a MISLEADING verdict. While some supporting evidence exists, '
-        'the contradicting evidence and omitted context are substantial."}'
+        '"reasoning": "After reviewing both arguments, the claim merits a MISLEADING verdict. '
+        'While Agent A identified supporting evidence in peer-reviewed literature, Agent B '
+        'demonstrated that the data cited is outdated and has been flagged by AP Fact Check '
+        'and Snopes. The claim\'s framing misleads by presenting dated figures as current facts.", '
+        '"decisive_factors": ['
+        '"The primary source cited is over 10 years old, significantly weakening the Pro argument.", '
+        '"AP Fact Check and Snopes have both independently investigated and flagged this narrative."'
+        ']}'
     ),
     "extract_claims": (
         "[MOCK] Extracted claims: "

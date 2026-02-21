@@ -47,7 +47,7 @@
  * See docs/developers/ISHAAN.md for full task list and backend guide.
  */
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   analyzeDeepfakeAudio,
   analyzeDeepfakeImage,
@@ -360,6 +360,132 @@ function DeepfakeCard({ result, mediaKind }) {
   )
 }
 
+/* ─── debate transcript components ───────────────────────────────────────────── */
+
+/**
+ * Renders one agent's argument with inline [Title](URL) markdown links made
+ * clickable, followed by a row of source chips.
+ */
+function DebateAgentCard({ label, icon, argument, sources, color, bg, border }) {
+  // Split argument text on markdown links and render each chunk appropriately
+  const renderArgument = (text) => {
+    const parts = text.split(/(\[[^\]]+\]\(https?:\/\/[^)]+\))/g)
+    return parts.map((part, i) => {
+      const match = part.match(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/)
+      if (match) {
+        return (
+          <a key={i} href={match[2]} target="_blank" rel="noopener noreferrer"
+            className="underline transition-opacity hover:opacity-75" style={{ color }}>
+            {match[1]}
+          </a>
+        )
+      }
+      return <span key={i}>{part}</span>
+    })
+  }
+
+  return (
+    <div className="rounded-xl p-5" style={{ background: bg, border: `1px solid ${border}` }}>
+      <p className="text-xs font-semibold mb-3" style={{ color }}>{icon} {label}</p>
+      <p className="text-slate-300 text-sm leading-relaxed mb-4">
+        {renderArgument(argument)}
+      </p>
+      {sources?.length > 0 && (
+        <div>
+          <p className="text-xs text-slate-600 uppercase tracking-widest mb-2">Sources cited</p>
+          <div className="flex flex-wrap gap-2">
+            {sources.map((s, i) => (
+              <a key={i} href={s.url || '#'} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg transition-opacity hover:opacity-75"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', color: '#94a3b8' }}>
+                <span className="text-slate-600 font-mono shrink-0">[{i + 1}]</span>
+                <span className="truncate max-w-[180px]">{s.title}</span>
+                <span className="text-slate-700 shrink-0">↗</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Collapsible panel showing the full Pro → Con → Judge debate transcript.
+ * Rendered below the FactCard/ScamCard grid whenever factResult.debate exists.
+ */
+function DebateBox({ debate }) {
+  const [open, setOpen] = useState(true)
+  if (!debate) return null
+
+  return (
+    <div className="rounded-2xl overflow-hidden"
+      style={{ border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.01)' }}>
+
+      {/* Toggle header */}
+      <button onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-6 py-4 text-left transition-colors hover:bg-white/[0.02]"
+        style={{ background: 'rgba(255,255,255,0.02)' }}>
+        <div className="flex items-center gap-3">
+          <span className="text-base select-none">⚖️</span>
+          <span className="text-sm font-semibold text-slate-300">AI Debate Transcript</span>
+          <span className="text-xs px-2 py-0.5 rounded-full text-slate-500"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            3 agents
+          </span>
+        </div>
+        <span className="text-slate-600 text-xs font-medium">{open ? '▲ Collapse' : '▼ Expand'}</span>
+      </button>
+
+      {open && (
+        <div className="px-6 pb-6 pt-3 space-y-4">
+
+          {/* Agent A — Pro */}
+          <DebateAgentCard
+            label="Agent A — Supporting Evidence"
+            icon="🟢"
+            argument={debate.pro_argument}
+            sources={debate.pro_sources}
+            color="#10b981"
+            bg="rgba(16,185,129,0.04)"
+            border="rgba(16,185,129,0.14)"
+          />
+
+          {/* Agent B — Con */}
+          <DebateAgentCard
+            label="Agent B — Counter Evidence"
+            icon="🔴"
+            argument={debate.con_argument}
+            sources={debate.con_sources}
+            color="#ef4444"
+            bg="rgba(239,68,68,0.04)"
+            border="rgba(239,68,68,0.14)"
+          />
+
+          {/* Judge */}
+          <div className="rounded-xl p-5"
+            style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.16)' }}>
+            <p className="text-xs font-semibold text-indigo-400 mb-3">⚖️ Judge — Final Reasoning</p>
+            <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">
+              {debate.judge_reasoning}
+            </p>
+          </div>
+
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ─── pipeline step labels (shown during fact-check loading) ─────────────────── */
+
+const PIPELINE_STEPS = [
+  { icon: '🔍', label: 'Searching the web for evidence…' },
+  { icon: '🟢', label: 'Agent A building supporting case…' },
+  { icon: '🔴', label: 'Agent B building counter-case…' },
+  { icon: '⚖️', label: 'Judge deliberating final verdict…' },
+]
+
 /* ─── main component ─────────────────────────────────────────────────────────── */
 
 export default function Analyze() {
@@ -375,7 +501,19 @@ export default function Analyze() {
   const [deepfakeResult, setDeepfakeResult] = useState(null)
   const [mediaKind,     setMediaKind]     = useState(null)
   const [feedback,      setFeedback]      = useState(null)
+  const [pipelineStep,  setPipelineStep]  = useState(-1)
   const fileRef = useRef(null)
+
+  // Advance the pipeline step indicator every ~2 s while a text/URL analysis is running.
+  // Steps: search → agent pro → agent con → judge (mirrors the real backend pipeline).
+  useEffect(() => {
+    if (!loading || tab === 'media') { setPipelineStep(-1); return }
+    setPipelineStep(0)
+    const id = setInterval(() => {
+      setPipelineStep(s => (s < PIPELINE_STEPS.length - 1 ? s + 1 : s))
+    }, 2200)
+    return () => clearInterval(id)
+  }, [loading, tab])
 
   // Reset all result state. Called before each new analysis and when switching tabs.
   // Not resetting before a new analysis would cause stale results to flash briefly.
@@ -636,15 +774,32 @@ export default function Analyze() {
         )}
 
         {/* ── Analyse button ── */}
-        <div className="mt-7 flex items-center gap-4">
-          <button onClick={handleAnalyse} disabled={!canSubmit}
-            className="btn-primary px-9 py-3.5 flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed">
-            {loading ? <><span className="spinner" />Analysing…</> : <><span>🔍</span>Analyse</>}
-          </button>
-          {loading && (
-            <p className="text-xs text-slate-600 animate-pulse">
-              {tab === 'media' ? 'Running detection…' : 'Fact-checking + scam check in parallel…'}
-            </p>
+        <div className="mt-7 flex flex-col gap-4">
+          <div className="flex items-center gap-4">
+            <button onClick={handleAnalyse} disabled={!canSubmit}
+              className="btn-primary px-9 py-3.5 flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed">
+              {loading ? <><span className="spinner" />Analysing…</> : <><span>🔍</span>Analyse</>}
+            </button>
+            {loading && tab === 'media' && (
+              <p className="text-xs text-slate-600 animate-pulse">Running detection…</p>
+            )}
+          </div>
+
+          {/* Pipeline step indicator — text / URL fact-check only */}
+          {loading && tab !== 'media' && (
+            <div className="flex flex-col gap-1.5 pl-1">
+              {PIPELINE_STEPS.map((step, i) => {
+                const done    = i < pipelineStep
+                const active  = i === pipelineStep
+                return (
+                  <div key={i} className="flex items-center gap-2 text-xs transition-all duration-300"
+                    style={{ color: done ? '#10b981' : active ? '#e2e8f0' : '#334155', opacity: done || active ? 1 : 0.45 }}>
+                    <span style={{ fontSize: 11 }}>{done ? '✓' : step.icon}</span>
+                    <span className={active ? 'animate-pulse' : ''}>{step.label}</span>
+                  </div>
+                )
+              })}
+            </div>
           )}
         </div>
       </div>
@@ -659,6 +814,11 @@ export default function Analyze() {
               <FactCard result={factResult} onSave={handleSave} />
               <ScamCard result={scamResult} feedback={feedback} onFeedback={handleFeedback} />
             </div>
+          )}
+
+          {/* Debate transcript — shown whenever a fact-check debate is available */}
+          {factResult?.debate && (
+            <DebateBox debate={factResult.debate} />
           )}
 
           {/* Media: deepfake card (full width) */}
