@@ -1,154 +1,251 @@
 /**
- * Popup.tsx — Chrome extension popup UI.
+ * Popup.tsx — Chrome Extension Popup — Phase 4.
  *
- * Phase 0: Shows API connectivity status and a brief description.
- * Phase 4: Will add:
- *   - Analysis result for the current tab's URL
- *   - Quick triage badge (flagged / clean)
- *   - Link to detailed report in the web app
- *   - Settings toggle (on/off, sensitivity)
+ * Features:
+ *   - API connectivity status badge
+ *   - On/Off toggle (persisted via chrome.storage.sync)
+ *   - Sensitivity selector: Low / Medium / High
+ *   - "Analyze this page" button (triggers quick triage on current-tab URL)
+ *   - Result card showing verdict + confidence + summary
+ *   - Link to TruthGuard web app
  *
- * Security note: No API keys here. All AI calls go through the backend proxy.
- * The API_BASE_URL is configurable via extension storage (Phase 4).
+ * Security: No API keys stored here. All AI calls go through the background worker.
  */
 
 import { useEffect, useState } from 'react'
 
-// Default to localhost for development; Phase 4 makes this configurable
-const API_BASE_URL = 'http://localhost:8000'
-
 type ConnectionStatus = 'checking' | 'connected' | 'disconnected'
+type Sensitivity = 'low' | 'medium' | 'high'
 
-const styles = {
-  container: {
-    width: 320,
-    padding: 16,
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-    backgroundColor: '#0f172a',
-    color: '#f1f5f9',
-    minHeight: 200,
-  } as React.CSSProperties,
+interface Settings {
+  enabled: boolean
+  sensitivity: Sensitivity
+  apiBase: string
+}
 
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  } as React.CSSProperties,
+interface TriageResult {
+  verdict: string
+  confidence: number
+  summary: string
+}
 
-  title: {
-    fontSize: 18,
-    fontWeight: 700,
-    color: '#34d399',
-  } as React.CSSProperties,
+const DEFAULT_SETTINGS: Settings = {
+  enabled: true,
+  sensitivity: 'medium',
+  apiBase: 'http://localhost:8000',
+}
 
-  subtitle: {
-    fontSize: 12,
-    color: '#64748b',
-    marginBottom: 16,
-  } as React.CSSProperties,
+// ── Inline styles (no Tailwind in popup to keep bundle small) ─────────────────
 
-  statusBadge: (status: ConnectionStatus) =>
-    ({
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: 6,
-      padding: '6px 10px',
-      borderRadius: 6,
-      fontSize: 12,
-      marginBottom: 16,
-      backgroundColor:
-        status === 'connected' ? '#064e3b' : status === 'checking' ? '#1e293b' : '#450a0a',
-      color:
-        status === 'connected' ? '#34d399' : status === 'checking' ? '#94a3b8' : '#fca5a5',
-      border: '1px solid',
-      borderColor:
-        status === 'connected' ? '#065f46' : status === 'checking' ? '#334155' : '#7f1d1d',
-    }) as React.CSSProperties,
-
-  dot: (status: ConnectionStatus) =>
-    ({
-      width: 6,
-      height: 6,
-      borderRadius: '50%',
-      backgroundColor:
-        status === 'connected' ? '#34d399' : status === 'checking' ? '#94a3b8' : '#f87171',
-      animation: status === 'checking' ? 'pulse 1s infinite' : 'none',
-    }) as React.CSSProperties,
-
-  description: {
-    fontSize: 12,
-    color: '#64748b',
-    lineHeight: 1.6,
-    marginBottom: 12,
-  } as React.CSSProperties,
-
-  phaseTag: {
-    fontSize: 10,
-    color: '#475569',
-    borderTop: '1px solid #1e293b',
-    paddingTop: 8,
-    marginTop: 8,
-  } as React.CSSProperties,
+const C = {
+  bg:       '#0f172a',
+  surface:  'rgba(255,255,255,0.04)',
+  border:   'rgba(255,255,255,0.08)',
+  text:     '#f1f5f9',
+  muted:    '#64748b',
+  accent:   '#34d399',
+  violet:   '#818cf8',
+  red:      '#ef4444',
+  amber:    '#f59e0b',
 } as const
 
-export default function Popup() {
-  const [status, setStatus] = useState<ConnectionStatus>('checking')
-  const [dbStatus, setDbStatus] = useState<string>('')
+const VERDICT_COLORS: Record<string, string> = {
+  TRUE:       '#10b981',
+  FALSE:      '#ef4444',
+  MISLEADING: '#f59e0b',
+  UNVERIFIED: '#6366f1',
+  SATIRE:     '#8b5cf6',
+}
 
+export default function Popup() {
+  const [status,      setStatus]      = useState<ConnectionStatus>('checking')
+  const [dbStatus,    setDbStatus]    = useState('')
+  const [settings,    setSettings]    = useState<Settings>(DEFAULT_SETTINGS)
+  const [analysing,   setAnalysing]   = useState(false)
+  const [result,      setResult]      = useState<TriageResult | null>(null)
+
+  // ── Load connection status + settings ──────────────────────────────────────
   useEffect(() => {
-    fetch(`${API_BASE_URL}/health`, { signal: AbortSignal.timeout(5000) })
+    // Health check
+    fetch(`${DEFAULT_SETTINGS.apiBase}/health`, { signal: AbortSignal.timeout(5000) })
       .then((r) => r.json())
       .then((data: { status: string; database: string }) => {
         setStatus('connected')
         setDbStatus(data.database)
       })
       .catch(() => setStatus('disconnected'))
+
+    // Load persisted settings
+    chrome.runtime.sendMessage({ type: 'GET_SETTINGS' }, (res) => {
+      if (res?.ok) setSettings(res.data as Settings)
+    })
   }, [])
 
+  // ── Toggle enabled ─────────────────────────────────────────────────────────
+  function toggleEnabled(): void {
+    const next = { ...settings, enabled: !settings.enabled }
+    setSettings(next)
+    chrome.runtime.sendMessage({ type: 'SET_SETTINGS', payload: { enabled: next.enabled } })
+  }
+
+  // ── Change sensitivity ─────────────────────────────────────────────────────
+  function changeSensitivity(s: Sensitivity): void {
+    const next = { ...settings, sensitivity: s }
+    setSettings(next)
+    chrome.runtime.sendMessage({ type: 'SET_SETTINGS', payload: { sensitivity: s } })
+  }
+
+  // ── Analyse current tab URL ────────────────────────────────────────────────
+  function analyseCurrentTab(): void {
+    setAnalysing(true)
+    setResult(null)
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const url = tabs[0]?.url ?? ''
+      if (!url || url.startsWith('chrome://')) {
+        setResult({ verdict: 'UNVERIFIED', confidence: 0, summary: 'Cannot analyse this page.' })
+        setAnalysing(false)
+        return
+      }
+      fetch(`${settings.apiBase}/api/v1/triage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: `URL: ${url}` }),
+      })
+        .then((r) => r.json())
+        .then((data: TriageResult) => { setResult(data); setAnalysing(false) })
+        .catch(() => {
+          setResult({ verdict: 'UNVERIFIED', confidence: 0, summary: 'API unreachable.' })
+          setAnalysing(false)
+        })
+    })
+  }
+
   const statusLabel = {
-    checking: 'Connecting...',
-    connected: `API connected · DB ${dbStatus}`,
+    checking:     'Connecting…',
+    connected:    `API connected · DB ${dbStatus}`,
     disconnected: 'API unreachable',
   }[status]
 
+  const vColor = result ? (VERDICT_COLORS[result.verdict] ?? C.muted) : C.muted
+
   return (
-    <div style={styles.container}>
+    <div style={{ width: 320, padding: 16, fontFamily: 'system-ui,-apple-system,sans-serif', background: C.bg, color: C.text, minHeight: 220 }}>
+
       {/* Header */}
-      <div style={styles.header}>
-        {/* Inline shield icon */}
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="#34d399"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
         </svg>
-        <span style={styles.title}>TruthGuard</span>
-      </div>
-      <div style={styles.subtitle}>Misinformation &amp; Deepfake Detection</div>
+        <span style={{ fontSize: 17, fontWeight: 700, color: C.accent }}>TruthGuard</span>
 
-      {/* API status */}
-      <div style={styles.statusBadge(status)}>
-        <div style={styles.dot(status)} />
+        {/* On/Off toggle — right-aligned */}
+        <button
+          onClick={toggleEnabled}
+          title={settings.enabled ? 'Disable scanning' : 'Enable scanning'}
+          style={{
+            marginLeft: 'auto',
+            padding: '3px 10px',
+            borderRadius: 12,
+            fontSize: 11,
+            fontWeight: 700,
+            background: settings.enabled ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.12)',
+            color:      settings.enabled ? C.accent : C.red,
+            border:     `1px solid ${settings.enabled ? 'rgba(16,185,129,0.35)' : 'rgba(239,68,68,0.3)'}`,
+            cursor: 'pointer',
+          }}
+        >
+          {settings.enabled ? 'ON' : 'OFF'}
+        </button>
+      </div>
+
+      <div style={{ fontSize: 11, color: C.muted, marginBottom: 12 }}>Misinformation &amp; Deepfake Detection</div>
+
+      {/* Connection status */}
+      <div style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        padding: '5px 9px', borderRadius: 6, fontSize: 11, marginBottom: 12,
+        background: status === 'connected' ? '#064e3b' : status === 'checking' ? '#1e293b' : '#450a0a',
+        color:      status === 'connected' ? C.accent  : status === 'checking' ? C.muted   : '#fca5a5',
+        border: '1px solid',
+        borderColor: status === 'connected' ? '#065f46' : status === 'checking' ? '#334155' : '#7f1d1d',
+      }}>
+        <div style={{ width: 6, height: 6, borderRadius: '50%', background: status === 'connected' ? C.accent : status === 'checking' ? C.muted : '#f87171' }} />
         {statusLabel}
       </div>
 
-      {/* Usage hint */}
-      <p style={styles.description}>
-        Highlight any text on a webpage and right-click to analyze it with TruthGuard.
-      </p>
+      {/* Sensitivity */}
+      <div style={{ marginBottom: 12 }}>
+        <p style={{ fontSize: 11, color: C.muted, marginBottom: 6 }}>Scan sensitivity</p>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {(['low', 'medium', 'high'] as Sensitivity[]).map((s) => (
+            <button
+              key={s}
+              onClick={() => changeSensitivity(s)}
+              style={{
+                flex: 1, padding: '4px 0', borderRadius: 5, fontSize: 11, fontWeight: 600,
+                cursor: 'pointer', textTransform: 'capitalize',
+                background: settings.sensitivity === s ? 'rgba(99,102,241,0.2)' : C.surface,
+                color:      settings.sensitivity === s ? C.violet : C.muted,
+                border:     `1px solid ${settings.sensitivity === s ? 'rgba(99,102,241,0.4)' : C.border}`,
+              }}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
 
-      <p style={styles.description}>
-        Phase 4 will add automatic misinformation flags on X and Instagram posts.
-      </p>
+      {/* Analyse current tab */}
+      <button
+        onClick={analyseCurrentTab}
+        disabled={analysing || !settings.enabled || status !== 'connected'}
+        style={{
+          width: '100%', padding: '7px 0', borderRadius: 7, fontSize: 12,
+          fontWeight: 600, cursor: analysing ? 'wait' : 'pointer',
+          background: 'rgba(99,102,241,0.15)', color: C.violet,
+          border: '1px solid rgba(99,102,241,0.35)', marginBottom: 10,
+          opacity: (analysing || !settings.enabled || status !== 'connected') ? 0.45 : 1,
+        }}
+      >
+        {analysing ? 'Analysing…' : '🔍 Analyse this page'}
+      </button>
 
-      <div style={styles.phaseTag}>Phase 0 — Scaffold · v0.1.0</div>
+      {/* Result card */}
+      {result && (
+        <div style={{
+          padding: '10px 12px', borderRadius: 8,
+          background: `rgba(${vColor === C.accent ? '16,185,129' : '99,102,241'},0.08)`,
+          border: `1px solid ${vColor}40`,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: vColor, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              {result.verdict}
+            </span>
+            <span style={{ fontSize: 11, color: C.muted }}>{result.confidence}% confidence</span>
+          </div>
+          <p style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.5, margin: 0 }}>{result.summary}</p>
+        </div>
+      )}
+
+      {/* Hint */}
+      {!result && (
+        <p style={{ fontSize: 11, color: C.muted, lineHeight: 1.55 }}>
+          Highlight text on any page and right-click → <em style={{ color: '#94a3b8' }}>Analyze with TruthGuard</em>.
+        </p>
+      )}
+
+      {/* Footer */}
+      <div style={{ fontSize: 10, color: '#334155', borderTop: '1px solid #1e293b', paddingTop: 8, marginTop: 10, display: 'flex', justifyContent: 'space-between' }}>
+        <span>Phase 4 · v0.1.0</span>
+        <a
+          href="http://localhost:5173"
+          target="_blank"
+          rel="noreferrer"
+          style={{ color: C.violet, textDecoration: 'none' }}
+        >
+          Open Web App ↗
+        </a>
+      </div>
     </div>
   )
 }

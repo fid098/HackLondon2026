@@ -98,8 +98,8 @@ _MOCK_RESPONSES: dict[str, str] = {
         '"reasoning": "[MOCK] No real detection performed — mock mode active."}'
     ),
     "quick_triage": (
-        '{"flagged": false, "confidence": 0.3, '
-        '"reason": "[MOCK] Quick triage — no real analysis performed."}'
+        '{"verdict": "UNVERIFIED", "confidence": 30, '
+        '"summary": "[MOCK] Quick triage complete — no real analysis in mock mode."}'
     ),
 }
 

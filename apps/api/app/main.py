@@ -21,7 +21,9 @@ from app.core.database import close_mongo_connection, connect_to_mongo
 from app.routes.auth import router as auth_router
 from app.routes.factcheck import router as factcheck_router
 from app.routes.health import router as health_router
+from app.routes.heatmap import router as heatmap_router
 from app.routes.reports import router as reports_router
+from app.routes.triage import router as triage_router
 from app.routes.users import router as users_router
 
 # ─── Logging ───────────────────────────────────────────────────────────────────
@@ -87,8 +89,13 @@ app.include_router(users_router)
 app.include_router(factcheck_router)
 app.include_router(reports_router)
 
+# Phase 3 — Heatmap
+app.include_router(heatmap_router)
+
+# Phase 4 — Chrome Extension Quick Triage
+app.include_router(triage_router)
+
 # Future phases will add:
-# from app.routes.heatmap import router as heatmap_router     # Phase 3
 # from app.routes.deepfake import router as deepfake_router   # Phase 5
 # from app.routes.scam import router as scam_router           # Phase 6
 

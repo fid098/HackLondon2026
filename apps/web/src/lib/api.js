@@ -149,8 +149,29 @@ export async function saveReport(reportData) {
 
 /* ─── heatmap ─────────────────────────────────────────────────────────────────── */
 
+/**
+ * Fetch the combined heatmap snapshot (events + regions + narratives + total).
+ * @param {{ category?: string, hours?: number }} opts
+ * @returns {Promise<HeatmapResponse>}
+ */
 export async function getHeatmapEvents({ category, hours = 24 } = {}) {
   const qs = new URLSearchParams({ hours })
   if (category && category !== 'All') qs.set('category', category)
   return get(`/api/v1/heatmap?${qs}`)
+}
+
+/**
+ * Open a WebSocket to the heatmap live-feed stream.
+ * Each message is a JSON object: { type, message, delta, timestamp }
+ *
+ * @param {(msg: object) => void} onMessage  - called for each frame
+ * @returns {WebSocket}
+ */
+export function openHeatmapStream(onMessage) {
+  const wsUrl = BASE_URL.replace(/^http/, 'ws') + '/api/v1/heatmap/stream'
+  const ws = new WebSocket(wsUrl)
+  ws.onmessage = (e) => {
+    try { onMessage(JSON.parse(e.data)) } catch (_) { /* ignore malformed frames */ }
+  }
+  return ws
 }
