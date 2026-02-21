@@ -12,7 +12,8 @@
  * In production this wires to the MongoDB Change Streams SSE endpoint.
  */
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { getHeatmapEvents, openHeatmapStream } from '../lib/api'
 
 /* ─── mock data ──────────────────────────────────────────────────────────── */
 
@@ -173,9 +174,13 @@ L24,68 L20,70 L16,68 L12,65 L8,65 Z
 
 export default function Heatmap() {
   const [category,    setCategory]    = useState('All')
-  const [liveIndex,   setLiveIndex]   = useState(0)
+  const [liveFeed,    setLiveFeed]    = useState(FEED_ITEMS[0])
   const [totalEvents, setTotalEvents] = useState(55234)
+  const [hotspots,    setHotspots]    = useState(HOTSPOTS)
+  const [regions,     setRegions]     = useState(REGIONS)
+  const [narratives,  setNarratives]  = useState(NARRATIVES)
   const mapRef = useRef(null)
+  const wsRef  = useRef(null)
   const [mapW, setMapW] = useState(800)
 
   /* Resize observer for responsive map */
@@ -186,20 +191,55 @@ export default function Heatmap() {
     return () => ro.disconnect()
   }, [])
 
-  /* Simulated live feed */
+  /* Load heatmap snapshot from API, fall back to mock data silently */
+  const fetchHeatmap = useCallback(async () => {
+    try {
+      const data = await getHeatmapEvents()   // fetch all categories; filter client-side
+      setHotspots(data.events)
+      setRegions(data.regions)
+      setNarratives(data.narratives)
+      setTotalEvents(data.total_events)
+    } catch (_err) {
+      // Backend unavailable — keep the mock data already in state
+    }
+  }, [])
+
+  useEffect(() => { fetchHeatmap() }, [fetchHeatmap])
+
+  /* WebSocket live feed — fall back to simulated interval */
   useEffect(() => {
-    const id = setInterval(() => {
-      setLiveIndex((i) => (i + 1) % FEED_ITEMS.length)
-      setTotalEvents((n) => n + Math.floor(Math.random() * 8))
-    }, 3000)
-    return () => clearInterval(id)
+    let ws
+    let fallbackId
+    try {
+      ws = openHeatmapStream((msg) => {
+        if (msg.message) setLiveFeed(msg.message)
+        if (msg.delta)   setTotalEvents((n) => n + msg.delta)
+      })
+      wsRef.current = ws
+    } catch (_err) {
+      // jsdom / test env: WebSocket may not be available — use interval
+      let idx = 0
+      fallbackId = setInterval(() => {
+        idx = (idx + 1) % FEED_ITEMS.length
+        setLiveFeed(FEED_ITEMS[idx])
+        setTotalEvents((n) => n + Math.floor(Math.random() * 8))
+      }, 3000)
+    }
+    return () => {
+      wsRef.current?.close()
+      if (fallbackId) clearInterval(fallbackId)
+    }
   }, [])
 
   const mapH  = Math.round(mapW * 0.42)
   const scale = mapW / 100
 
-  const filtered = NARRATIVES.filter(
+  /* Client-side category filter on whatever data we have */
+  const filtered = narratives.filter(
     (n) => category === 'All' || n.category === category,
+  )
+  const visibleSpots = hotspots.filter(
+    (h) => category === 'All' || h.category === category,
   )
 
   return (
@@ -248,11 +288,11 @@ export default function Heatmap() {
           LIVE
         </span>
         <p
-          key={liveIndex}
+          key={liveFeed}
           className="text-sm text-slate-400 truncate"
           style={{ animation: 'fadeIn 0.4s ease-out both' }}
         >
-          {FEED_ITEMS[liveIndex]}
+          {liveFeed}
         </p>
       </div>
 
@@ -299,7 +339,7 @@ export default function Heatmap() {
           />
 
           {/* Hotspot markers */}
-          {HOTSPOTS.map((spot) => (
+          {visibleSpots.map((spot) => (
             <HotspotMarker key={spot.label} spot={spot} scale={scale} />
           ))}
         </svg>
@@ -317,7 +357,7 @@ export default function Heatmap() {
 
       {/* ── Region stats ── */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-10">
-        {REGIONS.map((r) => <RegionCard key={r.name} region={r} />)}
+        {regions.map((r) => <RegionCard key={r.name} region={r} />)}
       </div>
 
       {/* ── Trending narratives ── */}
