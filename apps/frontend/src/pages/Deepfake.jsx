@@ -155,15 +155,17 @@ export default function Deepfake() {
   return (
     <div className="relative max-w-3xl mx-auto px-5 py-14">
 
-      {/* ── Background orbs ── */}
+      {/* ── Background shapes ── */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden>
-        <div className="orb orb-violet" style={{ width: 500, height: 500, top: '-10%', left: '-15%', opacity: 0.08 }} />
-        <div className="orb orb-green"  style={{ width: 350, height: 350, bottom: '5%', right: '-10%', opacity: 0.06 }} />
+        <div className="absolute blur-3xl" style={{ width: 500, height: 340, top: '-10%', left: '-15%', borderRadius: '50% 50% 40% 60% / 60% 40% 60% 40%', background: 'radial-gradient(circle, rgba(239,68,68,0.22), transparent 70%)' }} />
+        <div className="absolute rounded-full blur-3xl" style={{ width: 360, height: 360, bottom: '5%', right: '-10%', background: 'radial-gradient(circle, rgba(185,28,28,0.18), transparent 70%)' }} />
+        <div className="absolute blur-2xl" style={{ width: 280, height: 420, top: '25%', right: '20%', borderRadius: '30% 70% 70% 30% / 50% 50% 50% 50%', background: 'radial-gradient(circle, rgba(239,68,68,0.1), transparent 70%)' }} />
+        <div className="absolute rounded-full blur-3xl" style={{ width: 200, height: 200, bottom: '25%', left: '5%', background: 'radial-gradient(circle, rgba(220,38,38,0.14), transparent 70%)' }} />
       </div>
 
       {/* ── Page header ── */}
       <div className="mb-10">
-        <p className="text-xs text-violet-400 uppercase tracking-[3px] font-semibold mb-3">
+        <p className="text-xs text-red-500 uppercase tracking-[3px] font-semibold mb-3">
           Phase 5 · Deepfake Detection
         </p>
         <h1 className="text-4xl font-extrabold text-white mb-2">Detect Synthetic Media</h1>
@@ -186,8 +188,8 @@ export default function Deepfake() {
           onClick={() => fileRef.current?.click()}
           className="rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-3 py-14 cursor-pointer transition-all duration-200"
           style={{
-            borderColor: dragOver ? 'rgba(129,140,248,0.6)' : 'rgba(255,255,255,0.1)',
-            background:  dragOver ? 'rgba(129,140,248,0.05)' : 'rgba(255,255,255,0.01)',
+            borderColor: dragOver ? 'rgba(239,68,68,0.6)' : 'rgba(255,255,255,0.1)',
+            background:  dragOver ? 'rgba(239,68,68,0.05)' : 'rgba(255,255,255,0.01)',
           }}
         >
           <span className="text-5xl select-none">{file ? (kindIcon[kind] ?? '📁') : '📂'}</span>
@@ -257,9 +259,9 @@ export default function Deepfake() {
             disabled={!file || loading}
             className="px-9 py-3.5 rounded-xl text-sm font-semibold flex items-center gap-2.5 transition-all duration-200 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
             style={{
-              background: 'rgba(129,140,248,0.15)',
-              color: '#818cf8',
-              border: '1px solid rgba(129,140,248,0.35)',
+              background: 'rgba(239,68,68,0.15)',
+              color: '#ef4444',
+              border: '1px solid rgba(239,68,68,0.35)',
             }}
           >
             {loading ? (
@@ -343,11 +345,6 @@ export default function Deepfake() {
         </div>
       )}
 
-      {/* ── Disclaimer ── */}
-      <p className="text-center text-xs text-slate-700 mt-10 max-w-xl mx-auto leading-relaxed">
-        TruthGuard deepfake detection is <em>probabilistic</em> and not 100% accurate.
-        Always corroborate with additional sources before drawing conclusions.
-      </p>
     </div>
   )
 }

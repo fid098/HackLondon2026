@@ -50,12 +50,12 @@ export default function Navbar({ currentPage, onNavigate, user, onLogin, onLogou
             <div
               className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
               style={{
-                background: 'linear-gradient(135deg, #059669, #10b981)',
-                boxShadow:  '0 0 0 0 rgba(16,185,129,0)',
+                background: 'linear-gradient(135deg, #dc2626, #ef4444)',
+                boxShadow:  '0 0 0 0 rgba(239,68,68,0)',
                 transition: 'box-shadow 0.3s',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.boxShadow = '0 0 20px rgba(16,185,129,0.4)')}
-              onMouseLeave={(e) => (e.currentTarget.style.boxShadow = '0 0 0 0 rgba(16,185,129,0)')}
+              onMouseEnter={(e) => (e.currentTarget.style.boxShadow = '0 0 20px rgba(239,68,68,0.4)')}
+              onMouseLeave={(e) => (e.currentTarget.style.boxShadow = '0 0 0 0 rgba(239,68,68,0)')}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -63,7 +63,7 @@ export default function Navbar({ currentPage, onNavigate, user, onLogin, onLogou
             </div>
 
             <div className="flex flex-col items-start leading-none">
-              <span className="text-[17px] font-bold text-white tracking-tight group-hover:text-emerald-400 transition-colors">
+              <span className="text-[17px] font-bold text-white tracking-tight group-hover:text-red-400 transition-colors">
                 TruthGuard
               </span>
               <span className="text-[10px] text-slate-600 tracking-widest uppercase font-medium mt-0.5">
@@ -83,12 +83,12 @@ export default function Navbar({ currentPage, onNavigate, user, onLogin, onLogou
                   className={[
                     'px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 focus:outline-none',
                     isActive
-                      ? 'text-emerald-400'
+                      ? 'text-red-400'
                       : 'text-slate-400 hover:text-slate-200',
                   ].join(' ')}
                   style={
                     isActive
-                      ? { background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)' }
+                      ? { background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }
                       : { background: 'transparent', border: '1px solid transparent' }
                   }
                   aria-current={isActive ? 'page' : undefined}
@@ -107,21 +107,21 @@ export default function Navbar({ currentPage, onNavigate, user, onLogin, onLogou
                 <button
                   onClick={() => setUserMenuOpen((o) => !o)}
                   className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all duration-150 focus:outline-none"
-                  style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}
+                  style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}
                   aria-label="User menu"
                   aria-expanded={userMenuOpen}
                 >
                   {/* Avatar initial */}
                   <div
                     className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-                    style={{ background: 'linear-gradient(135deg, #059669, #10b981)', color: 'white' }}
+                    style={{ background: 'linear-gradient(135deg, #dc2626, #ef4444)', color: 'white' }}
                   >
                     {(user.display_name || user.email || '?')[0].toUpperCase()}
                   </div>
-                  <span className="text-emerald-400 font-medium max-w-[120px] truncate">
+                  <span className="text-red-400 font-medium max-w-[120px] truncate">
                     {user.display_name || user.email}
                   </span>
-                  <span className="text-emerald-700 text-xs" aria-hidden="true">▾</span>
+                  <span className="text-red-700 text-xs" aria-hidden="true">▾</span>
                 </button>
 
                 {/* Dropdown */}
@@ -146,10 +146,10 @@ export default function Navbar({ currentPage, onNavigate, user, onLogin, onLogou
               /* Logged-out state */
               <button
                 onClick={onLogin}
-                className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-all duration-150 focus:outline-none text-emerald-400 hover:text-emerald-300"
-                style={{ border: '1px solid rgba(16,185,129,0.25)', background: 'rgba(16,185,129,0.06)' }}
+                className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-all duration-150 focus:outline-none text-red-400 hover:text-red-300"
+                style={{ border: '1px solid rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.06)' }}
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
                 Sign In
               </button>
             )}
