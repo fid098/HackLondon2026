@@ -2,10 +2,20 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import Navbar from '../Navbar'
 
-function setup(currentPage = 'home') {
+function setup(currentPage = 'home', user = null) {
   const onNavigate = vi.fn()
-  render(<Navbar currentPage={currentPage} onNavigate={onNavigate} />)
-  return { onNavigate }
+  const onLogin    = vi.fn()
+  const onLogout   = vi.fn()
+  render(
+    <Navbar
+      currentPage={currentPage}
+      onNavigate={onNavigate}
+      user={user}
+      onLogin={onLogin}
+      onLogout={onLogout}
+    />,
+  )
+  return { onNavigate, onLogin, onLogout }
 }
 
 describe('Navbar', () => {
@@ -62,5 +72,29 @@ describe('Navbar', () => {
     setup('heatmap')
     const factCheckBtn = screen.getByText('Fact Check').closest('button')
     expect(factCheckBtn).not.toHaveAttribute('aria-current')
+  })
+
+  it('shows Sign In button when no user is logged in', () => {
+    setup('home', null)
+    expect(screen.getByText('Sign In')).toBeInTheDocument()
+  })
+
+  it('calls onLogin when Sign In is clicked', () => {
+    const { onLogin } = setup('home', null)
+    fireEvent.click(screen.getByText('Sign In'))
+    expect(onLogin).toHaveBeenCalled()
+  })
+
+  it('shows user avatar initial when logged in', () => {
+    const user = { id: '1', email: 'alice@example.com', display_name: 'Alice' }
+    setup('home', user)
+    expect(screen.getByText('A')).toBeInTheDocument()  // avatar initial
+    expect(screen.getByText('Alice')).toBeInTheDocument()
+  })
+
+  it('does not show Sign In button when user is logged in', () => {
+    const user = { id: '1', email: 'alice@example.com', display_name: 'Alice' }
+    setup('home', user)
+    expect(screen.queryByText('Sign In')).toBeNull()
   })
 })

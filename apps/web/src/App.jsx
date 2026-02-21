@@ -1,23 +1,24 @@
 /**
- * App.jsx — Root component with state-based navigation.
+ * App.jsx — Root component with state-based navigation and auth state.
  *
- * Why state-based instead of React Router:
- *   Content switches instantly with a CSS fade-up animation — no URL
- *   changes, no full-page transitions, no router overhead. Pages feel
- *   like they "refresh" in place, which is exactly what the user requested.
+ * Auth:
+ *   - Token lives in localStorage (managed by api.js)
+ *   - User object lives in React state; re-hydrated on mount via GET /auth/me
+ *   - AuthModal is rendered as an overlay — no separate page/route needed
  *
- * To add a new page:
- *   1. Import the component
- *   2. Add it to PAGES with a string key
- *   3. Add a nav item in Navbar.jsx
+ * Navigation:
+ *   - State-based (no React Router): page string → component
+ *   - transitionKey increments on every page change to force page-enter animation
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import AuthModal from './components/AuthModal'
 import Navbar from './components/Navbar'
-import Landing from './pages/Landing'
 import FactCheck from './pages/FactCheck'
 import Heatmap from './pages/Heatmap'
+import Landing from './pages/Landing'
 import Reports from './pages/Reports'
+import { getMe, getToken, logout } from './lib/api'
 
 const PAGES = {
   home:      Landing,
@@ -27,27 +28,83 @@ const PAGES = {
 }
 
 export default function App() {
-  const [page, setPage] = useState('home')
-  // transitionKey increments on every page change, forcing React to
-  // remount the <main> child and re-run the CSS page-enter animation
+  const [page,          setPage]          = useState('home')
   const [transitionKey, setTransitionKey] = useState(0)
+  const [user,          setUser]          = useState(null)      // null = logged out
+  const [authModal,     setAuthModal]     = useState(null)      // null | 'login' | 'register'
+  const [authLoading,   setAuthLoading]   = useState(true)      // re-hydrating on mount
 
+  /* ── Re-hydrate user on first load ── */
+  useEffect(() => {
+    if (!getToken()) {
+      setAuthLoading(false)
+      return
+    }
+    getMe()
+      .then(setUser)
+      .catch(() => {/* token expired / invalid — already cleared by api.js */})
+      .finally(() => setAuthLoading(false))
+  }, [])
+
+  /* ── Navigation ── */
   const navigate = (newPage) => {
     if (newPage === page) return
     setPage(newPage)
     setTransitionKey((k) => k + 1)
-    // Scroll to top on page switch
     window.scrollTo({ top: 0, behavior: 'instant' })
+  }
+
+  /* ── Auth actions ── */
+  const openLogin    = () => setAuthModal('login')
+  const openRegister = () => setAuthModal('register')
+  const closeAuth    = () => setAuthModal(null)
+
+  const handleAuthSuccess = (userObj) => {
+    setUser(userObj)
+    closeAuth()
+  }
+
+  const handleLogout = () => {
+    logout()
+    setUser(null)
   }
 
   const PageComponent = PAGES[page] || Landing
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
-      <Navbar currentPage={page} onNavigate={navigate} />
+      <Navbar
+        currentPage={page}
+        onNavigate={navigate}
+        user={user}
+        onLogin={openLogin}
+        onLogout={handleLogout}
+      />
+
       <main key={transitionKey} className="flex-1 page-enter">
-        <PageComponent onNavigate={navigate} />
+        {authLoading ? (
+          /* Tiny skeleton while re-hydrating token */
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <span className="spinner" style={{ width: 28, height: 28, borderWidth: 3 }} />
+          </div>
+        ) : (
+          <PageComponent
+            onNavigate={navigate}
+            user={user}
+            onLogin={openLogin}
+            onRegister={openRegister}
+          />
+        )}
       </main>
+
+      {/* Auth modal overlay */}
+      {authModal && (
+        <AuthModal
+          mode={authModal}
+          onSuccess={handleAuthSuccess}
+          onClose={closeAuth}
+        />
+      )}
     </div>
   )
 }
