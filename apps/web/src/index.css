@@ -2,52 +2,210 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  /* Dark theme base — all pages inherit this */
-  html {
-    @apply bg-gray-950 text-gray-100;
-  }
-
-  body {
-    @apply antialiased;
-    font-family: Inter, system-ui, sans-serif;
-  }
-
-  /* Scrollbar styling for dark theme */
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  ::-webkit-scrollbar-track {
-    @apply bg-gray-900;
-  }
-  ::-webkit-scrollbar-thumb {
-    @apply bg-gray-700 rounded-full;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    @apply bg-gray-600;
-  }
+/* ─── CSS custom properties ───────────────────────────────────────────────── */
+:root {
+  --bg-base:    #04040a;
+  --accent:     #10b981;
+  --accent-dim: rgba(16, 185, 129, 0.12);
+  --border:     rgba(255, 255, 255, 0.07);
+  --border-h:   rgba(255, 255, 255, 0.13);
 }
 
-@layer components {
-  /* Reusable card style */
-  .card {
-    @apply bg-gray-800 border border-gray-700 rounded-xl p-6;
+/* ─── Base ────────────────────────────────────────────────────────────────── */
+@layer base {
+  html { scroll-behavior: smooth; }
+
+  body {
+    background-color: var(--bg-base);
+    color: #f1f5f9;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Primary button */
-  .btn-primary {
-    @apply px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white font-medium
-           rounded-lg transition-colors duration-150 focus:outline-none
-           focus:ring-2 focus:ring-brand-500 focus:ring-offset-2
-           focus:ring-offset-gray-950;
-  }
+  ::-webkit-scrollbar       { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: var(--bg-base); }
+  ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
+  ::-webkit-scrollbar-thumb:hover { background: #334155; }
 
-  /* Secondary button */
-  .btn-secondary {
-    @apply px-5 py-2.5 bg-gray-700 hover:bg-gray-600 text-white font-medium
-           rounded-lg transition-colors duration-150 focus:outline-none
-           focus:ring-2 focus:ring-gray-500 focus:ring-offset-2
-           focus:ring-offset-gray-950;
-  }
+  ::selection { background: rgba(16, 185, 129, 0.25); }
+}
+
+/* ─── Page transition ────────────────────────────────────────────────────── */
+.page-enter {
+  animation: pageEnter 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Glassmorphism ──────────────────────────────────────────────────────── */
+.glass {
+  background:          rgba(255, 255, 255, 0.03);
+  border:              1px solid var(--border);
+  backdrop-filter:     blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition: background 0.2s, border-color 0.2s;
+}
+.glass:hover {
+  background:    rgba(255, 255, 255, 0.05);
+  border-color:  var(--border-h);
+}
+.glass-card {
+  background:   rgba(255, 255, 255, 0.03);
+  border:       1px solid var(--border);
+  border-radius: 16px;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  padding: 24px;
+  transition: background 0.2s, border-color 0.2s, transform 0.2s;
+}
+.glass-card:hover {
+  background:   rgba(255, 255, 255, 0.05);
+  border-color: var(--border-h);
+  transform:    translateY(-2px);
+}
+
+/* ─── Gradient text ──────────────────────────────────────────────────────── */
+.gradient-text {
+  background: linear-gradient(135deg, #10b981 0%, #34d399 45%, #6ee7b7 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.gradient-text-violet {
+  background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.gradient-text-white {
+  background: linear-gradient(135deg, #ffffff 0%, #94a3b8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ─── Animated background orbs ──────────────────────────────────────────── */
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  pointer-events: none;
+  animation: orbDrift 10s ease-in-out infinite;
+}
+.orb-green  { background: radial-gradient(circle, rgba(16,185,129,0.4), transparent 70%); animation-delay: 0s; }
+.orb-violet { background: radial-gradient(circle, rgba(139,92,246,0.35), transparent 70%); animation-delay: -4s; }
+.orb-blue   { background: radial-gradient(circle, rgba(59,130,246,0.25), transparent 70%); animation-delay: -7s; }
+.orb-amber  { background: radial-gradient(circle, rgba(245,158,11,0.2), transparent 70%); animation-delay: -2s; }
+
+@keyframes orbDrift {
+  0%, 100% { transform: translateY(0) translateX(0) scale(1); }
+  33%       { transform: translateY(-30px) translateX(15px) scale(1.05); }
+  66%       { transform: translateY(15px) translateX(-20px) scale(0.97); }
+}
+
+/* ─── Buttons ────────────────────────────────────────────────────────────── */
+.btn-primary {
+  background:    linear-gradient(135deg, #059669, #10b981);
+  color:         white;
+  padding:       11px 26px;
+  border-radius: 10px;
+  font-weight:   600;
+  font-size:     15px;
+  border:        none;
+  cursor:        pointer;
+  transition:    transform 0.15s, box-shadow 0.15s;
+}
+.btn-primary:hover:not(:disabled) {
+  transform:   translateY(-2px);
+  box-shadow:  0 10px 30px rgba(16, 185, 129, 0.35);
+}
+.btn-primary:active:not(:disabled) { transform: translateY(0); }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.btn-secondary {
+  background:    rgba(255, 255, 255, 0.06);
+  color:         #cbd5e1;
+  padding:       11px 26px;
+  border-radius: 10px;
+  font-weight:   600;
+  font-size:     15px;
+  border:        1px solid rgba(255, 255, 255, 0.1);
+  cursor:        pointer;
+  transition:    transform 0.15s, background 0.15s, border-color 0.15s;
+}
+.btn-secondary:hover {
+  background:    rgba(255, 255, 255, 0.1);
+  border-color:  rgba(255, 255, 255, 0.18);
+  transform:     translateY(-2px);
+}
+
+/* ─── Inputs ─────────────────────────────────────────────────────────────── */
+.input-field {
+  width:         100%;
+  background:    rgba(255, 255, 255, 0.04);
+  border:        1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding:       13px 16px;
+  color:         #f1f5f9;
+  font-size:     15px;
+  outline:       none;
+  transition:    border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+.input-field:focus {
+  border-color: rgba(16, 185, 129, 0.5);
+  background:   rgba(255, 255, 255, 0.06);
+  box-shadow:   0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+.input-field::placeholder { color: #475569; }
+
+/* ─── Tabs ───────────────────────────────────────────────────────────────── */
+.tab {
+  padding:       8px 18px;
+  border-radius: 8px;
+  font-size:     14px;
+  font-weight:   500;
+  color:         #64748b;
+  cursor:        pointer;
+  border:        1px solid transparent;
+  background:    transparent;
+  transition:    all 0.2s;
+}
+.tab:hover { color: #94a3b8; background: rgba(255, 255, 255, 0.05); }
+.tab.active {
+  background:   rgba(16, 185, 129, 0.12);
+  color:        #34d399;
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+/* ─── Verdict badges ─────────────────────────────────────────────────────── */
+.verdict-true       { background: rgba(16,185,129,0.14); color: #34d399; border: 1px solid rgba(16,185,129,0.25); border-radius: 20px; }
+.verdict-false      { background: rgba(239,68,68,0.14);  color: #f87171; border: 1px solid rgba(239,68,68,0.25);  border-radius: 20px; }
+.verdict-misleading { background: rgba(245,158,11,0.14); color: #fbbf24; border: 1px solid rgba(245,158,11,0.25); border-radius: 20px; }
+.verdict-unverified { background: rgba(100,116,139,0.14);color: #94a3b8; border: 1px solid rgba(100,116,139,0.25);border-radius: 20px; }
+.verdict-satire     { background: rgba(139,92,246,0.14); color: #a78bfa; border: 1px solid rgba(139,92,246,0.25); border-radius: 20px; }
+
+/* ─── Loading spinner ────────────────────────────────────────────────────── */
+.spinner {
+  width:  20px; height: 20px;
+  border: 2px solid rgba(255,255,255,0.2);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── Section divider ────────────────────────────────────────────────────── */
+.section-divider {
+  width: 100%; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+  margin: 2rem 0;
+}
+
+/* ─── Dot grid background ────────────────────────────────────────────────── */
+.dot-grid {
+  background-image: radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px);
+  background-size: 28px 28px;
 }
