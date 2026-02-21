@@ -55,42 +55,54 @@ _MOCK_RESPONSES: dict[str, str] = {
     ),
     # agent_pro / agent_con are the keys used by debate_pipeline.py
     "agent_pro": (
-        "ARGUMENT: Based on available evidence, there is credible support for this claim. "
-        "According to [Reuters Fact Check](https://www.reuters.com/fact-check/) peer-reviewed "
-        "literature and expert statements align with the core assertion. "
-        "The [WHO](https://www.who.int/news/) has also published data consistent with this "
-        "position, and the underlying methodology has been validated by multiple independent institutions.\n"
+        "ARGUMENT: Based on available evidence, there is strong credible support for this claim "
+        "from independent Tier 1 sources. According to [Reuters ★★★★★](https://www.reuters.com/) "
+        "the core facts have been independently verified and corroborated. "
+        "[BBC News ★★★★★](https://www.bbc.com/) has reported consistently with this position, "
+        "and the underlying data appears in cross-referenced PRIMARY sources with no significant "
+        "discrepancies found across two independent Tier 1 wire services.\n\n"
+        "KEY EVIDENCE: [Reuters ★★★★★](https://www.reuters.com/fact-check/) — PRIMARY source "
+        "directly confirming the core claim with corroborating data from official statements.\n\n"
         "POINTS:\n"
-        "- The underlying data point exists in peer-reviewed literature.\n"
-        "- Geographic scope of the claim is broadly correct.\n"
-        "- Credible institutions have cited similar statistics."
+        "- The core assertion is directly supported by a Tier 1 wire service — [Reuters ★★★★★](https://www.reuters.com/)\n"
+        "- Independent cross-reference confirms the claim — [BBC News ★★★★★](https://www.bbc.com/)\n"
+        "- Official institutional data aligns with this position — [GOV.UK ★★★★★](https://www.gov.uk/)\n\n"
+        "SOURCE QUALITY: HIGH"
     ),
     "agent_con": (
-        "ARGUMENT: Counter-evidence indicates this claim contains significant inaccuracies "
-        "or omits crucial context that fundamentally alters its meaning. "
-        "According to [AP Fact Check](https://apnews.com/hub/ap-fact-check) this narrative "
-        "has been investigated and found to be misleading. "
-        "[Snopes](https://www.snopes.com/) similarly concluded that the claim omits critical "
-        "context, and the data cited is over a decade old.\n"
+        "ARGUMENT: Counter-evidence suggests the claim, while not demonstrably false, lacks "
+        "important context that affects its full interpretation. "
+        "[AP Fact Check ★★★★★](https://apnews.com/hub/ap-fact-check) has noted similar claims "
+        "require additional nuance around scope and timeframe. "
+        "[Snopes ★★★★☆](https://www.snopes.com/) classifies related narratives as partially "
+        "accurate. The available counter-evidence is largely TYPE B — the core fact may be "
+        "accurate but the framing omits significant context. I acknowledge this is a relatively "
+        "weak counter-case as no TYPE A direct contradiction was found.\n\n"
         "POINTS:\n"
-        "- The study cited predates the claim by over a decade — the landscape has changed.\n"
-        "- The figure was cherry-picked; the same paper shows contrary trends in most cases.\n"
-        "- Multiple independent fact-checkers have flagged variants of this claim."
+        "- TYPE B — The claim lacks critical context about scope and timeline — [Snopes ★★★★☆](https://www.snopes.com/)\n"
+        "- TYPE C — Primary sourcing relies on secondary reports rather than direct documentation — [AP Fact Check ★★★★★](https://apnews.com/hub/ap-fact-check)\n"
+        "- TYPE B — Important qualifications in original data are not reflected in the claim — [PolitiFact ★★★★☆](https://www.politifact.com/)\n\n"
+        "SOURCE QUALITY: MEDIUM"
     ),
     "judge": (
-        '{"verdict": "MISLEADING", "confidence": 72, '
-        '"summary": "The claim contains partially accurate information but omits critical '
-        'context that significantly changes its meaning. The core statistic cited is real, '
-        'but the source and timeframe have been misrepresented.", '
+        '{"verdict": "TRUE", "confidence": 78, '
+        '"summary": "The claim is broadly accurate based on available Tier 1/2 evidence. '
+        'Agent A produced strong supporting evidence from credible primary sources. '
+        'Agent B\'s counter-case consisted of TYPE B and TYPE C evidence only, which per '
+        'evaluation rules cannot flip a well-sourced claim to MISLEADING.", '
         '"category": "General", '
-        '"reasoning": "After reviewing both arguments, the claim merits a MISLEADING verdict. '
-        'While Agent A identified supporting evidence in peer-reviewed literature, Agent B '
-        'demonstrated that the data cited is outdated and has been flagged by AP Fact Check '
-        'and Snopes. The claim\'s framing misleads by presenting dated figures as current facts.", '
+        '"reasoning": "STEP 1 — Both agents cited independent sources from different domains. '
+        'STEP 2 — Agent A avg score 0.85 (HIGH) with two Tier 1 wire services. Agent B avg 0.71 (MEDIUM). '
+        'STEP 3 — Corroboration data supports the core claim. '
+        'STEP 4 — No TYPE A counter-evidence from Agent B; all points are TYPE B (missing context) '
+        'or TYPE C (source quality challenge) — insufficient to override well-sourced supporting evidence. '
+        'STEP 5 — No hallucination detected. STEP 6 — Fact-check data does not contradict Agent A.", '
         '"decisive_factors": ['
-        '"The primary source cited is over 10 years old, significantly weakening the Pro argument.", '
-        '"AP Fact Check and Snopes have both independently investigated and flagged this narrative."'
-        ']}'
+        '"Agent A provided Tier 1 primary source evidence directly confirming the core claim.", '
+        '"Agent B produced only TYPE B/C counter-evidence — cannot flip TRUE verdict under evaluation rules."'
+        '], '
+        '"source_quality_assessment": "Agent A: HIGH quality — two independent Tier 1 wire services cross-referenced. Agent B: MEDIUM quality — fact-checkers cited but no direct TYPE A contradiction found.", '
+        '"agent_scores": {"agent_a": 8.5, "agent_b": 4.2}}'
     ),
     "extract_claims": (
         "[MOCK] Extracted claims: "
