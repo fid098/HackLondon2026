@@ -18,7 +18,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.database import close_mongo_connection, connect_to_mongo
+from app.routes.auth import router as auth_router
+from app.routes.factcheck import router as factcheck_router
 from app.routes.health import router as health_router
+from app.routes.reports import router as reports_router
+from app.routes.users import router as users_router
 
 # ─── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -72,13 +76,18 @@ app.add_middleware(
 
 
 # ─── Routes ────────────────────────────────────────────────────────────────────
-# Phase 0: health only
+# Phase 0
 app.include_router(health_router, prefix="/health", tags=["health"])
 
+# Phase 1 — Auth + Users
+app.include_router(auth_router)
+app.include_router(users_router)
+
+# Phase 2 — Fact Check + Reports
+app.include_router(factcheck_router)
+app.include_router(reports_router)
+
 # Future phases will add:
-# from app.routes.auth import router as auth_router          # Phase 1
-# from app.routes.factcheck import router as factcheck_router # Phase 2
-# from app.routes.reports import router as reports_router     # Phase 2
 # from app.routes.heatmap import router as heatmap_router     # Phase 3
 # from app.routes.deepfake import router as deepfake_router   # Phase 5
 # from app.routes.scam import router as scam_router           # Phase 6

@@ -10,7 +10,8 @@
  *   - Pagination (client-side for demo; in production from MongoDB Atlas)
  */
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
+import { getReports } from '../lib/api'
 
 /* ─── verdict config ─────────────────────────────────────────────────────── */
 
@@ -215,42 +216,78 @@ function ReportCard({ report, onNavigate }) {
 
 /* ─── main component ─────────────────────────────────────────────────────── */
 
+const FILTER_TABS = [
+  { key: 'ALL',        label: 'All' },
+  { key: 'TRUE',       label: 'True' },
+  { key: 'FALSE',      label: 'False' },
+  { key: 'MISLEADING', label: 'Misleading' },
+  { key: 'UNVERIFIED', label: 'Unverified' },
+  { key: 'SATIRE',     label: 'Satire' },
+]
+
 export default function Reports({ onNavigate }) {
-  const [query,       setQuery]       = useState('')
-  const [filter,      setFilter]      = useState('ALL')
-  const [page,        setPage]        = useState(1)
+  const [query,      setQuery]      = useState('')
+  const [filter,     setFilter]     = useState('ALL')
+  const [page,       setPage]       = useState(1)
+  const [reports,    setReports]    = useState(MOCK_REPORTS)   // start with mock, replace on load
+  const [total,      setTotal]      = useState(MOCK_REPORTS.length)
+  const [totalPages, setTotalPages] = useState(Math.ceil(MOCK_REPORTS.length / PAGE_SIZE))
+  const [apiLoaded,  setApiLoaded]  = useState(false)
 
-  const FILTER_TABS = [
-    { key: 'ALL',       label: 'All' },
-    { key: 'TRUE',      label: 'True' },
-    { key: 'FALSE',     label: 'False' },
-    { key: 'MISLEADING',label: 'Misleading' },
-    { key: 'UNVERIFIED',label: 'Unverified' },
-    { key: 'SATIRE',    label: 'Satire' },
-  ]
+  /* ── Normalize API report to match UI shape ── */
+  const normaliseReport = (r) => ({
+    id:         r.id,
+    verdict:    r.verdict,
+    confidence: r.confidence,
+    title:      r.source_ref || r.summary?.slice(0, 80) || 'Report',
+    summary:    r.summary,
+    sourceType: r.source_type,
+    sourceRef:  r.source_ref,
+    date:       r.created_at ? r.created_at.slice(0, 10) : '',
+    category:   r.category,
+    sources:    (r.sources || []).map((s) => (typeof s === 'string' ? s : s.title || s.url || 'Source')),
+  })
 
-  const filtered = useMemo(() => {
-    const q = query.toLowerCase()
-    return MOCK_REPORTS.filter((r) => {
-      const matchVerdict = filter === 'ALL' || r.verdict === filter
-      const matchQuery   = !q || r.title.toLowerCase().includes(q) || r.summary.toLowerCase().includes(q)
-      return matchVerdict && matchQuery
-    })
-  }, [query, filter])
+  /* ── Load from API (replaces mock on success) ── */
+  const fetchReports = useCallback(async () => {
+    try {
+      const data = await getReports({ page, limit: PAGE_SIZE, verdict: filter, q: query || undefined })
+      setReports(data.items.map(normaliseReport))
+      setTotal(data.total)
+      setTotalPages(data.pages)
+      setApiLoaded(true)
+    } catch (_err) {
+      // Backend not available — keep showing mock data silently
+      if (!apiLoaded) {
+        // Client-side filter mock data as fallback
+        const q = query.toLowerCase()
+        const allFiltered = MOCK_REPORTS.filter((r) => {
+          const matchVerdict = filter === 'ALL' || r.verdict === filter
+          const matchQuery   = !q || r.title?.toLowerCase().includes(q) || r.summary.toLowerCase().includes(q)
+          return matchVerdict && matchQuery
+        })
+        setReports(allFiltered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE))
+        setTotal(allFiltered.length)
+        setTotalPages(Math.max(1, Math.ceil(allFiltered.length / PAGE_SIZE)))
+      }
+    }
+  }, [page, filter, query, apiLoaded])
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const paged      = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  useEffect(() => { fetchReports() }, [fetchReports])
 
   /* Reset to page 1 when filter/search changes */
   const applyFilter = (k) => { setFilter(k); setPage(1) }
   const applyQuery  = (v) => { setQuery(v);  setPage(1) }
 
-  /* Summary stats */
+  /* Summary stats from whatever data we have */
   const stats = useMemo(() => {
+    const source = apiLoaded ? reports : MOCK_REPORTS
     const counts = {}
-    MOCK_REPORTS.forEach((r) => { counts[r.verdict] = (counts[r.verdict] || 0) + 1 })
+    source.forEach((r) => { counts[r.verdict] = (counts[r.verdict] || 0) + 1 })
     return counts
-  }, [])
+  }, [reports, apiLoaded])
+
+  const paged = reports  // API already pages; mock fallback already sliced
 
   return (
     <div className="relative max-w-4xl mx-auto px-5 py-14">
@@ -278,7 +315,7 @@ export default function Reports({ onNavigate }) {
           className="flex items-center gap-2 px-4 py-2 rounded-xl"
           style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
         >
-          <span className="text-xl font-black text-white">{MOCK_REPORTS.length}</span>
+          <span className="text-xl font-black text-white">{total}</span>
           <span className="text-xs text-slate-600">total reports</span>
         </div>
         {Object.entries(stats).map(([verdict, count]) => {
@@ -348,7 +385,7 @@ export default function Reports({ onNavigate }) {
 
       {/* ── Results count ── */}
       <p className="text-xs text-slate-600 mb-5">
-        {filtered.length} report{filtered.length !== 1 ? 's' : ''} found
+        {total} report{total !== 1 ? 's' : ''} found
         {query && <> matching &ldquo;<span className="text-slate-400">{query}</span>&rdquo;</>}
       </p>
 

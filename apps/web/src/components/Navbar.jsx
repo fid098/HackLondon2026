@@ -5,9 +5,15 @@
  * Three nav items: Fact Check, Heatmap, Reports.
  * Active item highlighted with emerald accent.
  *
+ * Auth slot (right side):
+ *   - When user is null: "Sign In" button
+ *   - When user is set: avatar pill with display_name/email + logout option
+ *
  * Design: frosted glass with subtle bottom border.
  * No router — uses the onNavigate callback from App.jsx.
  */
+
+import { useState } from 'react'
 
 const NAV_ITEMS = [
   { id: 'factcheck', label: 'Fact Check' },
@@ -15,15 +21,17 @@ const NAV_ITEMS = [
   { id: 'reports',   label: 'Reports'    },
 ]
 
-export default function Navbar({ currentPage, onNavigate }) {
+export default function Navbar({ currentPage, onNavigate, user, onLogin, onLogout }) {
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+
   return (
     <nav
       style={{
-        position:    'sticky',
-        top:         0,
-        zIndex:      50,
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        background:  'rgba(4, 4, 10, 0.85)',
+        position:       'sticky',
+        top:            0,
+        zIndex:         50,
+        borderBottom:   '1px solid rgba(255,255,255,0.06)',
+        background:     'rgba(4, 4, 10, 0.85)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
       }}
@@ -39,7 +47,6 @@ export default function Navbar({ currentPage, onNavigate }) {
             aria-label="TruthGuard home"
             className="flex items-center gap-2.5 group focus:outline-none"
           >
-            {/* Shield icon with gradient background */}
             <div
               className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
               style={{
@@ -56,9 +63,7 @@ export default function Navbar({ currentPage, onNavigate }) {
             </div>
 
             <div className="flex flex-col items-start leading-none">
-              <span
-                className="text-[17px] font-bold text-white tracking-tight group-hover:text-emerald-400 transition-colors"
-              >
+              <span className="text-[17px] font-bold text-white tracking-tight group-hover:text-emerald-400 transition-colors">
                 TruthGuard
               </span>
               <span className="text-[10px] text-slate-600 tracking-widest uppercase font-medium mt-0.5">
@@ -94,16 +99,73 @@ export default function Navbar({ currentPage, onNavigate }) {
             })}
           </div>
 
-          {/* ── Right slot: status pill ── */}
-          <div
-            className="hidden md:flex items-center gap-1.5 text-xs text-slate-600 px-3 py-1.5 rounded-full"
-            style={{ border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.02)' }}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            v0.1.0 — Phase 0
+          {/* ── Auth slot ── */}
+          <div className="hidden md:flex items-center gap-2">
+            {user ? (
+              /* Logged-in user pill */
+              <div className="relative">
+                <button
+                  onClick={() => setUserMenuOpen((o) => !o)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all duration-150 focus:outline-none"
+                  style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}
+                  aria-label="User menu"
+                  aria-expanded={userMenuOpen}
+                >
+                  {/* Avatar initial */}
+                  <div
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                    style={{ background: 'linear-gradient(135deg, #059669, #10b981)', color: 'white' }}
+                  >
+                    {(user.display_name || user.email || '?')[0].toUpperCase()}
+                  </div>
+                  <span className="text-emerald-400 font-medium max-w-[120px] truncate">
+                    {user.display_name || user.email}
+                  </span>
+                  <span className="text-emerald-700 text-xs" aria-hidden="true">▾</span>
+                </button>
+
+                {/* Dropdown */}
+                {userMenuOpen && (
+                  <div
+                    className="absolute right-0 top-full mt-2 w-48 rounded-xl py-1 overflow-hidden z-50"
+                    style={{ background: 'rgba(8,12,24,0.98)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 12px 40px rgba(0,0,0,0.5)' }}
+                  >
+                    <div className="px-4 py-2.5 border-b border-white/5">
+                      <p className="text-xs text-slate-600 truncate">{user.email}</p>
+                    </div>
+                    <button
+                      onClick={() => { setUserMenuOpen(false); onLogout() }}
+                      className="w-full text-left px-4 py-2.5 text-sm text-slate-400 hover:text-red-400 hover:bg-red-500/5 transition-colors"
+                    >
+                      Sign Out
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Logged-out state */
+              <button
+                onClick={onLogin}
+                className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-all duration-150 focus:outline-none text-emerald-400 hover:text-emerald-300"
+                style={{ border: '1px solid rgba(16,185,129,0.25)', background: 'rgba(16,185,129,0.06)' }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Sign In
+              </button>
+            )}
           </div>
+
         </div>
       </div>
+
+      {/* Close user menu on outside click */}
+      {userMenuOpen && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setUserMenuOpen(false)}
+          aria-hidden="true"
+        />
+      )}
     </nav>
   )
 }

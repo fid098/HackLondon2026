@@ -38,20 +38,47 @@ _MOCK_RESPONSES: dict[str, str] = {
         "Set AI_MOCK_MODE=false and provide GEMINI_API_KEY for real responses."
     ),
     "debate_pro": (
-        "[MOCK PRO AGENT] Based on available evidence, there are supporting arguments "
-        "for this claim including: (1) published studies, (2) expert consensus, "
-        "(3) corroborating sources."
+        "ARGUMENT: Based on available evidence, there are supporting arguments "
+        "for this claim including published studies, expert consensus, and corroborating sources.\n"
+        "POINTS:\n"
+        "- Multiple peer-reviewed studies support the core assertion.\n"
+        "- Leading experts in the field have endorsed similar findings.\n"
+        "- The original source is a credible institution with a strong track record."
     ),
     "debate_con": (
-        "[MOCK CON AGENT] Counter-evidence suggests this claim is questionable because: "
-        "(1) contradicting studies exist, (2) context is missing, "
-        "(3) the original source is unreliable."
+        "ARGUMENT: Counter-evidence suggests this claim is questionable because "
+        "contradicting studies exist and key context has been omitted.\n"
+        "POINTS:\n"
+        "- Contradicting studies with larger sample sizes show opposing results.\n"
+        "- The claim omits critical context that changes its meaning.\n"
+        "- Three fact-checking organisations have flagged this narrative."
+    ),
+    # agent_pro / agent_con are the keys used by debate_pipeline.py
+    "agent_pro": (
+        "ARGUMENT: Based on available evidence, there is credible support for this claim. "
+        "Peer-reviewed literature and expert statements align with the core assertion.\n"
+        "POINTS:\n"
+        "- The underlying data point exists in peer-reviewed literature.\n"
+        "- Geographic scope of the claim is broadly correct.\n"
+        "- Credible institutions have cited similar statistics."
+    ),
+    "agent_con": (
+        "ARGUMENT: Counter-evidence indicates this claim contains significant inaccuracies "
+        "or omits crucial context that fundamentally alters its meaning.\n"
+        "POINTS:\n"
+        "- The study cited predates the claim by over a decade — the landscape has changed.\n"
+        "- The figure was cherry-picked; the same paper shows contrary trends in most cases.\n"
+        "- Multiple independent fact-checkers have flagged variants of this claim."
     ),
     "judge": (
-        "[MOCK JUDGE] VERDICT: UNVERIFIED. Confidence: 50%. "
-        "Both sides presented credible arguments. "
-        "Recommend consulting primary sources. "
-        "Sources: [mock-source-1, mock-source-2]"
+        '{"verdict": "MISLEADING", "confidence": 72, '
+        '"summary": "The claim contains partially accurate information but omits critical '
+        'context that significantly changes its meaning. The core statistic cited is real, '
+        'but the source and timeframe have been misrepresented.", '
+        '"category": "General", '
+        '"reasoning": "After reviewing both arguments and available fact-check data, '
+        'the claim merits a MISLEADING verdict. While some supporting evidence exists, '
+        'the contradicting evidence and omitted context are substantial."}'
     ),
     "extract_claims": (
         "[MOCK] Extracted claims: "
