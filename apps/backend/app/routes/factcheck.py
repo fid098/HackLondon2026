@@ -1,14 +1,65 @@
 """
 factcheck.py — Fact-check submission route.
 
-POST /api/v1/factcheck
-  1. Extract content (URL / text / media)
-  2. Run multi-agent debate pipeline
-  3. Persist report to MongoDB (if DB available)
-  4. Return full FactCheckResponse
+DEVELOPER: Ishaan
+─────────────────────────────────────────────────────────────────────────────
+This file owns the main fact-check AI pipeline endpoint.
 
-Authentication is optional: if a valid Bearer token is present the report
-is associated with that user; anonymous submissions are also accepted.
+Route:
+  POST /api/v1/factcheck  — accepts URL / text / media, runs the AI debate
+                            pipeline, persists to MongoDB, returns a full report.
+
+HOW THE DATA FLOWS
+──────────────────
+1. Frontend (Analyze.jsx) calls POST /api/v1/factcheck with source_type + content.
+2. content_extractor.py fetches/parses URLs (or passes text straight through).
+3. The 4-agent debate pipeline runs (see THE DEBATE PIPELINE below).
+4. The result is persisted to MongoDB `reports` collection (best-effort).
+5. A FactCheckResponse is returned immediately — this is synchronous, no polling.
+
+THE DEBATE PIPELINE  (app/ai/debate_pipeline.py)
+────────────────────────────────────────────────
+  Extractor Agent  → identifies the core falsifiable claim in the content
+  Pro Agent        → argues FOR the claim, finds supporting evidence
+  Con Agent        → argues AGAINST the claim with counter-evidence
+  Judge Agent      → synthesises both sides and issues verdict + confidence
+
+  Each agent is a Gemini Pro call. In mock mode (GEMINI_API_KEY not set) all
+  four agents return pre-scripted responses so tests never hit the API.
+
+WHAT TO IMPROVE (your tasks as Ishaan)
+────────────────────────────────────────
+- Wire the YouTube transcript extractor: if source_type='url' and the URL is
+  YouTube, call the YouTube Data API (or yt-dlp) to fetch the transcript, then
+  pass it as the content string to the debate pipeline.
+- Add streaming: use FastAPI's StreamingResponse + Server-Sent Events so the
+  frontend can render each agent's output as it arrives (faster perceived UX).
+- Cache common claims: hash the claim_text and skip the pipeline if the same
+  claim was checked in the last 24 h — store the hash in a `claim_cache` collection.
+- Improve category tagging: the Judge Agent guesses the category; add a
+  dedicated Gemini Flash classification call for speed and accuracy.
+
+TESTING YOUR CHANGES
+─────────────────────
+  cd apps/backend
+  pytest tests/test_factcheck.py -v       # unit + integration tests
+  pytest tests/test_rate_limit.py -v      # confirm 20/minute limit is enforced
+
+  # Manual test — text claim:
+  curl -X POST http://localhost:8000/api/v1/factcheck \\
+    -H 'Content-Type: application/json' \\
+    -d '{"source_type": "text", "text": "The moon is made of cheese."}'
+
+  # Manual test — URL:
+  curl -X POST http://localhost:8000/api/v1/factcheck \\
+    -H 'Content-Type: application/json' \\
+    -d '{"source_type": "url", "url": "https://example.com/article"}'
+
+AUTHENTICATION
+──────────────
+Bearer token is optional. If a valid JWT is provided the report is stored
+with user_id set in MongoDB; anonymous reports have user_id = null.
+Token decode logic is in app/core/security.py.
 """
 
 import logging

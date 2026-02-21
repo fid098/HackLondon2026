@@ -1,15 +1,58 @@
 /**
  * Landing.jsx — Home page shown when the TruthGuard logo is clicked.
  *
- * Design goals:
- *   - Full-height hero with animated gradient orbs
- *   - Gradient headline, animated badge
- *   - CTA buttons wired to state-based nav
- *   - Feature cards with glassmorphism
- *   - AI pipeline walkthrough
- *   - Prominent disclaimer
+ * DEVELOPER: Leena
+ * ─────────────────────────────────────────────────────────────────────────────
+ * This is your main frontend file. It owns the landing page design and layout.
+ *
+ * This component receives ONE prop:
+ *   onNavigate(page: string) — call this to navigate to another page.
+ *   Valid page values: 'analyze', 'heatmap', 'reports'
+ *   These map to routes in App.jsx → PAGES object.
+ *   Example: onNavigate('analyze') → shows the Analyze page.
+ *
+ * DESIGN SYSTEM NOTES
+ * ────────────────────
+ * - Background orbs: <div className="orb orb-green"> — see index.css .orb
+ *   These are blurred radial gradients. Control size with width/height,
+ *   position with top/left/right/bottom, intensity with opacity.
+ * - Glassmorphism cards: background rgba(255,255,255,0.02) + backdropFilter blur
+ * - Gradient headline text: className="gradient-text" — defined in index.css
+ * - Buttons: className="btn-primary" or "btn-secondary" — defined in index.css
+ * - Section divider: className="section-divider" — defined in index.css
+ *
+ * SECTIONS IN ORDER
+ * ──────────────────
+ * 1. HERO          — headline, sub-headline, CTA buttons, tech pills, scroll indicator
+ * 2. FEATURE CARDS — three glassmorphism cards (AI Suite, Heatmap, Reports)
+ * 3. PIPELINE      — "How It Works" 4-step flow diagram + model detail cards
+ * 4. DISCLAIMER    — legal disclaimer text
+ *
+ * WHAT TO IMPROVE (your tasks as Leena)
+ * ────────────────────────────────────────
+ * - Add a short demo GIF or screenshot above the fold (between sub-headline and CTAs).
+ * - Add a social proof section: "Built at HackLondon 2026 · X teams · Y participants".
+ * - Add a footer with links (GitHub repo, team info, license).
+ * - Add scroll-triggered entrance animations: use IntersectionObserver API or
+ *   install Framer Motion (npm i framer-motion) for smooth reveal effects.
+ * - Make the tech pills clickable: scroll to the relevant section of the page.
+ * - Consider a "dark/light mode" toggle — would require CSS variable overrides.
  */
 
+/* ─── Feature cards data ──────────────────────────────────────────────────── */
+// Each object represents one feature card in the "Three layers of truth" section.
+//
+// Fields:
+//   icon        — emoji shown at top of card
+//   title       — card heading
+//   description — card body text
+//   accent      — colour theme: color = text/arrow, dim = semi-transparent bg,
+//                               border = card border colour
+//   tag         — small badge in top-right corner (e.g. "Core Feature")
+//   page        — WHERE the card navigates to when clicked (via onNavigate)
+//
+// To add a new feature card: add a new object here with a valid `page` value.
+// To remove a card: delete the object.
 const FEATURES = [
   {
     icon:        '🤖',
@@ -17,7 +60,7 @@ const FEATURES = [
     description: 'One tab for everything: fact-check claims with a multi-agent debate, detect deepfakes in images/audio/video, and scan for scams — all running in parallel.',
     accent:      { color: '#10b981', dim: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.18)' },
     tag:         'Core Feature',
-    page:        'analyze',
+    page:        'analyze',   // clicking navigates to Analyze.jsx
   },
   {
     icon:        '🗺️',
@@ -25,7 +68,7 @@ const FEATURES = [
     description: 'Real-time world map of misinformation hotspots powered by MongoDB geospatial queries, aggregation pipelines, and Change Streams for live dashboard updates.',
     accent:      { color: '#3b82f6', dim: 'rgba(59,130,246,0.08)', border: 'rgba(59,130,246,0.18)' },
     tag:         'Live Data',
-    page:        'heatmap',
+    page:        'heatmap',   // clicking navigates to Heatmap.jsx
   },
   {
     icon:        '📊',
@@ -33,10 +76,18 @@ const FEATURES = [
     description: 'Every analysis is persisted to MongoDB Atlas. Full-text search, vector similarity search for related claims, and PDF/JSON export for every report.',
     accent:      { color: '#8b5cf6', dim: 'rgba(139,92,246,0.08)', border: 'rgba(139,92,246,0.18)' },
     tag:         'Persistent',
-    page:        'reports',
+    page:        'reports',   // clicking navigates to the Reports page
   },
 ]
 
+/* ─── AI pipeline steps ──────────────────────────────────────────────────── */
+// Displayed as a horizontal sequence of numbered boxes in the "How It Works" section.
+// num   — displayed inside the icon box (must be a string, e.g. '01')
+// label — bold text under the icon
+// sub   — small grey subtitle
+//
+// To add/remove a pipeline step, edit this array.
+// The arrow connectors between steps are rendered automatically.
 const PIPELINE_STEPS = [
   { num: '01', label: 'Submit',  sub: 'URL, text, media' },
   { num: '02', label: 'Extract', sub: 'Claims identified' },
@@ -44,16 +95,29 @@ const PIPELINE_STEPS = [
   { num: '04', label: 'Verdict', sub: 'Judge synthesizes' },
 ]
 
+/* ─── Technology stack pills ─────────────────────────────────────────────── */
+// Small monospace labels displayed in the hero section below the CTAs.
+// These are purely decorative — they don't link to anything.
+// To add/remove a tech: edit this array.
 const TECH_PILLS = [
   'Gemini 1.5 Pro', 'MongoDB Atlas', 'Vector Search',
   'Geospatial', 'Change Streams', 'FastAPI',
 ]
 
+/* ─── Landing page component ─────────────────────────────────────────────── */
+// onNavigate is passed down from App.jsx and switches the displayed page.
+// This component has NO internal state — it is a fully static presentation page.
 export default function Landing({ onNavigate }) {
   return (
     <div className="relative overflow-x-hidden">
 
-      {/* ── Background orbs ── */}
+      {/* ── Background orbs ──
+           Three blurred gradient circles positioned behind all content.
+           fixed = they don't scroll with the page.
+           pointer-events-none = they don't block user clicks.
+           To change a colour: swap 'orb-green' → 'orb-blue', 'orb-violet', etc.
+           Colour CSS variables are defined in index.css.
+           To move/resize: adjust width/height/top/left/right/bottom/opacity. */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="orb orb-green"  style={{ width: 700, height: 700, top: '-15%', left: '-15%',  opacity: 0.12 }} />
         <div className="orb orb-violet" style={{ width: 600, height: 600, top: '40%',  right: '-20%', opacity: 0.10 }} />
@@ -62,10 +126,12 @@ export default function Landing({ onNavigate }) {
 
       <div className="relative max-w-7xl mx-auto px-5">
 
-        {/* ══════════════════ HERO ══════════════════ */}
+        {/* ══════════════════ HERO SECTION ══════════════════ */}
+        {/* Full-height section — min-h-[90vh] keeps it nearly full screen. */}
+        {/* gap-7 controls vertical spacing between each child element. */}
         <section className="min-h-[90vh] flex flex-col items-center justify-center text-center py-24 gap-7">
 
-          {/* Animated badge */}
+          {/* Animated badge — the pulsing dot makes it feel "live" */}
           <div
             className="inline-flex items-center gap-2.5 px-5 py-2 rounded-full text-sm font-medium text-emerald-400"
             style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}
@@ -74,7 +140,7 @@ export default function Landing({ onNavigate }) {
             Built for HackLondon 2026 · Powered by Gemini 1.5 Pro
           </div>
 
-          {/* Hero heading */}
+          {/* Hero heading — "gradient-text" applies the green→blue gradient (see index.css) */}
           <h1
             className="text-6xl md:text-7xl lg:text-[88px] font-extrabold tracking-tighter leading-[1.03] max-w-4xl"
           >
@@ -85,13 +151,16 @@ export default function Landing({ onNavigate }) {
             <span style={{ color: '#334155' }}>Spreads</span>
           </h1>
 
-          {/* Sub-headline */}
+          {/* Sub-headline — one sentence describing TruthGuard */}
           <p className="text-xl text-slate-400 max-w-2xl leading-relaxed">
             TruthGuard uses multi-agent AI debates, deepfake detection, and real-time
             geospatial heatmaps to help you navigate the information landscape with confidence.
           </p>
 
-          {/* CTAs */}
+          {/* CTA buttons
+               btn-primary = filled green button (index.css)
+               btn-secondary = ghost/outline button (index.css)
+               onNavigate('analyze') / onNavigate('heatmap') triggers page switch in App.jsx */}
           <div className="flex flex-wrap items-center justify-center gap-4 pt-1">
             <button
               className="btn-primary text-base px-9 py-4"
@@ -107,7 +176,7 @@ export default function Landing({ onNavigate }) {
             </button>
           </div>
 
-          {/* Tech pills */}
+          {/* Technology stack pills — purely decorative labels */}
           <div className="flex flex-wrap justify-center gap-2 pt-2">
             {TECH_PILLS.map((p) => (
               <span
@@ -120,7 +189,7 @@ export default function Landing({ onNavigate }) {
             ))}
           </div>
 
-          {/* Scroll indicator */}
+          {/* Scroll indicator — gradient line fading to transparent */}
           <div className="pt-8 flex flex-col items-center gap-2 text-slate-700">
             <span className="text-xs tracking-widest uppercase">Scroll to explore</span>
             <div
@@ -130,7 +199,9 @@ export default function Landing({ onNavigate }) {
           </div>
         </section>
 
-        {/* ══════════════════ FEATURE CARDS ══════════════════ */}
+        {/* ══════════════════ FEATURE CARDS SECTION ══════════════════ */}
+        {/* Three glassmorphism cards from the FEATURES array above.
+            Each card lifts on hover (translateY -5px) and navigates on click. */}
         <section className="pb-24">
           <div className="text-center mb-14">
             <p className="text-xs text-emerald-500 uppercase tracking-[3px] font-semibold mb-3">
@@ -146,10 +217,10 @@ export default function Landing({ onNavigate }) {
                 key={f.title}
                 className="relative rounded-2xl p-7 cursor-pointer overflow-hidden"
                 style={{
-                  background:   f.accent.dim,
-                  border:       `1px solid ${f.accent.border}`,
-                  backdropFilter: 'blur(14px)',
-                  transition:   'transform 0.25s, box-shadow 0.25s',
+                  background:      f.accent.dim,          // semi-transparent tinted background
+                  border:          `1px solid ${f.accent.border}`,
+                  backdropFilter:  'blur(14px)',           // glassmorphism blur effect
+                  transition:      'transform 0.25s, box-shadow 0.25s',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.transform  = 'translateY(-5px)'
@@ -159,9 +230,9 @@ export default function Landing({ onNavigate }) {
                   e.currentTarget.style.transform  = 'translateY(0)'
                   e.currentTarget.style.boxShadow  = 'none'
                 }}
-                onClick={() => onNavigate(f.page)}
+                onClick={() => onNavigate(f.page)}        // navigate to the feature's page
               >
-                {/* Step number watermark */}
+                {/* Large number watermark in the background ("01", "02", "03") */}
                 <div
                   className="absolute top-4 right-6 text-7xl font-black select-none"
                   style={{ color: f.accent.border, lineHeight: 1 }}
@@ -190,7 +261,9 @@ export default function Landing({ onNavigate }) {
           </div>
         </section>
 
-        {/* ══════════════════ PIPELINE ══════════════════ */}
+        {/* ══════════════════ PIPELINE SECTION ══════════════════ */}
+        {/* Visualises the 4-step AI debate pipeline.
+            Arrows between steps are hidden on mobile (hidden md:block). */}
         <section className="pb-24">
           <div
             className="rounded-2xl p-10 md:p-14"
@@ -217,6 +290,7 @@ export default function Landing({ onNavigate }) {
                     <div className="text-white font-semibold text-sm">{step.label}</div>
                     <div className="text-slate-600 text-xs mt-0.5">{step.sub}</div>
                   </div>
+                  {/* Arrow connector between steps — hidden on mobile */}
                   {i < PIPELINE_STEPS.length - 1 && (
                     <div className="text-slate-700 text-xl font-light mb-6 hidden md:block">→</div>
                   )}
@@ -224,14 +298,14 @@ export default function Landing({ onNavigate }) {
               ))}
             </div>
 
-            {/* Model detail */}
+            {/* Model cards — which AI / DB handles each stage */}
             <div
               className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-4 text-center"
             >
               {[
-                { model: 'Gemini Flash', role: 'Quick triage · Chrome extension', color: '#10b981' },
-                { model: 'Gemini 1.5 Pro', role: 'Deep analysis · Agent debate · Multimodal', color: '#34d399' },
-                { model: 'MongoDB Atlas', role: 'Vector search · Geo · Change Streams', color: '#8b5cf6' },
+                { model: 'Gemini Flash',   role: 'Quick triage · Chrome extension',             color: '#10b981' },
+                { model: 'Gemini 1.5 Pro', role: 'Deep analysis · Agent debate · Multimodal',   color: '#34d399' },
+                { model: 'MongoDB Atlas',  role: 'Vector search · Geo · Change Streams',        color: '#8b5cf6' },
               ].map((m) => (
                 <div
                   key={m.model}
@@ -246,7 +320,9 @@ export default function Landing({ onNavigate }) {
           </div>
         </section>
 
-        {/* ══════════════════ DISCLAIMER ══════════════════ */}
+        {/* ══════════════════ DISCLAIMER SECTION ══════════════════ */}
+        {/* Legal disclaimer — keep this visible per the project brief.
+            section-divider is a thin horizontal line (defined in index.css). */}
         <section className="pb-16 text-center">
           <div className="section-divider" />
           <p className="text-xs text-slate-700 max-w-lg mx-auto mt-8 leading-relaxed">

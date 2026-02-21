@@ -1,17 +1,50 @@
 /**
  * Analyze.jsx — Unified AI Analysis Suite.
  *
- * Merges Fact Check + Deepfake Detection + Scam Check into one page.
+ * DEVELOPER: Ishaan
+ * ─────────────────────────────────────────────────────────────────────────────
+ * This is your main frontend file. It renders the content analysis page.
  *
- * Input modes:
- *   URL   — fact-check + scam check run in parallel
- *   Text  — fact-check + scam check run in parallel
- *   Media — image → deepfake image
- *           audio → deepfake audio + scam check
- *           video → deepfake video
+ * INPUT MODES
+ * ────────────
+ * URL   — calls submitClaim({ source_type:'url', url }) + checkScam in parallel
+ * Text  — calls submitClaim({ source_type:'text', text }) + checkScam in parallel
+ * Media:
+ *   image → calls analyzeDeepfakeImage({ image_b64, filename })
+ *   audio → calls analyzeDeepfakeAudio({ audio_b64, filename }) + checkScam in parallel
+ *   video → calls analyzeDeepfakeVideo({ video_b64, filename })
  *
- * All calls are parallel via Promise.allSettled — one failure never blocks the other.
- * Falls back to mock results if the backend is unavailable.
+ * All API calls use Promise.allSettled so one failure never blocks the other.
+ * If ALL calls fail, mock results (MOCK_FACT, MOCK_SCAM, MOCK_DEEPFAKE) are shown
+ * so the user always sees something useful even with no backend.
+ *
+ * RESULT CARDS
+ * ─────────────
+ * FactCard      — shows verdict badge, confidence ring, pro/con points, sources
+ * ScamCard      — shows is_scam badge, model_scores bar chart, feedback buttons
+ * DeepfakeCard  — shows is_deepfake badge, confidence ring, reasoning text
+ *
+ * API FUNCTIONS (from lib/api.js)
+ * ─────────────────────────────────
+ * submitClaim(payload)       → POST /api/v1/factcheck
+ * checkScam({ text })        → POST /api/v1/scam/check
+ * analyzeDeepfakeImage(...)  → POST /api/v1/deepfake/image
+ * analyzeDeepfakeAudio(...)  → POST /api/v1/deepfake/audio
+ * analyzeDeepfakeVideo(...)  → POST /api/v1/deepfake/video
+ * saveReport(reportData)     → POST /api/v1/reports
+ * submitFeedback(data)       → POST /api/v1/feedback
+ *
+ * WHAT TO IMPROVE (your tasks as Ishaan)
+ * ────────────────────────────────────────
+ * - Show per-agent intermediate results for the fact-check debate pipeline:
+ *   as each agent (Extractor → Pro → Con → Judge) finishes, update the UI.
+ *   Requires SSE streaming from the backend.
+ * - Add a "Share result" button that generates a shareable link/permalink.
+ * - Add a "Compare with previous analysis" feature for related claims.
+ * - Improve the YouTube URL detection: show a transcript preview before analysis.
+ * - Add a progress bar showing which step of the pipeline is running.
+ *
+ * See docs/developers/ISHAAN.md for full task list and backend guide.
  */
 
 import { useCallback, useRef, useState } from 'react'
@@ -25,15 +58,19 @@ import {
   submitFeedback,
 } from '../lib/api'
 
-/* ─── media helpers ──────────────────────────────────────────────────────────── */
+/* ─── Media file helpers ─────────────────────────────────────────────────────── */
 
+// MIME type lists for the file-picker accept attribute and drag-and-drop validation.
+// To add a new format: add its MIME type to the relevant array.
 const ACCEPTED_MEDIA = {
   image: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
   audio: ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4'],
   video: ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'],
 }
+// Flattened list used for <input accept="..."> and drag-and-drop type checks
 const ALL_MEDIA_TYPES = Object.values(ACCEPTED_MEDIA).flat()
 
+// Returns 'image' | 'audio' | 'video' | 'unknown' based on file.type MIME string
 const detectKind = (file) => {
   if (ACCEPTED_MEDIA.image.includes(file.type)) return 'image'
   if (ACCEPTED_MEDIA.audio.includes(file.type)) return 'audio'
@@ -41,13 +78,24 @@ const detectKind = (file) => {
   return 'unknown'
 }
 
+// Regex to detect YouTube URLs (watch, youtu.be short links, and Shorts)
 const isYouTubeUrl = (str) =>
   /(?:youtube\.com\/watch|youtu\.be\/|youtube\.com\/shorts\/)/.test(str)
 
+// Converts a File object to a base64 string (without the data: prefix).
+//
+// WHY BASE64?
+// The deepfake API endpoints expect image_b64 / audio_b64 / video_b64 as JSON strings.
+// Browsers can't send binary files in JSON; base64 encoding converts binary → ASCII string.
+// FileReader.readAsDataURL() returns "data:image/jpeg;base64,/9j/4AAQ..." —
+// we strip everything before the comma to get the raw base64 payload.
+//
+// NOTE: This reads the entire file into memory. For files > 50 MB this may
+// cause a tab crash on mobile. The 50 MB limit is enforced in selectFile() below.
 const readAsBase64 = (file) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader()
-    reader.onload  = (e) => resolve(e.target.result.split(',')[1])
+    reader.onload  = (e) => resolve(e.target.result.split(',')[1])   // strip "data:...;base64,"
     reader.onerror = reject
     reader.readAsDataURL(file)
   })
@@ -329,6 +377,8 @@ export default function Analyze() {
   const [feedback,      setFeedback]      = useState(null)
   const fileRef = useRef(null)
 
+  // Reset all result state. Called before each new analysis and when switching tabs.
+  // Not resetting before a new analysis would cause stale results to flash briefly.
   const clearResults = () => {
     setFactResult(null); setScamResult(null); setDeepfakeResult(null)
     setMediaKind(null); setFeedback(null); setError(null)
@@ -346,24 +396,35 @@ export default function Analyze() {
     e.preventDefault(); setDragOver(false); selectFile(e.dataTransfer?.files?.[0])
   }, [selectFile])
 
-  /* ── submit ── */
+  /* ── Main analysis handler ── */
   const handleAnalyse = async () => {
     clearResults()
     setLoading(true)
 
     try {
       if (tab === 'media' && mediaFile) {
+        // Convert the uploaded file to base64 before sending to the API.
+        // This is done once here and the string is reused across all API calls.
         const b64  = await readAsBase64(mediaFile)
         const kind = detectKind(mediaFile)
         setMediaKind(kind)
 
         if (kind === 'image') {
+          // Image: only deepfake detection (no scam check for images)
           const [df] = await Promise.allSettled([
             analyzeDeepfakeImage({ image_b64: b64, filename: mediaFile.name }),
           ])
           setDeepfakeResult(df.status === 'fulfilled' ? df.value : MOCK_DEEPFAKE)
 
         } else if (kind === 'audio') {
+          // Audio: deepfake detection + scam check in parallel.
+          // WHY PARALLEL? Both calls are independent — running them concurrently
+          // halves the total wait time vs running them sequentially.
+          // WHY Promise.allSettled (not Promise.all)?
+          //   Promise.all rejects immediately if ANY call fails.
+          //   Promise.allSettled waits for ALL calls and reports each result
+          //   individually as { status: 'fulfilled'|'rejected', value|reason }.
+          //   This means if the scam API is down, we still show the deepfake result.
           const [df, sc] = await Promise.allSettled([
             analyzeDeepfakeAudio({ audio_b64: b64, filename: mediaFile.name }),
             checkScam({ text: `Audio file: ${mediaFile.name}` }),
@@ -372,6 +433,7 @@ export default function Analyze() {
           setScamResult(sc.status === 'fulfilled' ? sc.value : MOCK_SCAM)
 
         } else if (kind === 'video') {
+          // Video: only deepfake detection (no scam check for video files)
           const [df] = await Promise.allSettled([
             analyzeDeepfakeVideo({ video_b64: b64, filename: mediaFile.name }),
           ])
@@ -379,21 +441,29 @@ export default function Analyze() {
         }
 
       } else {
+        // URL or Text tab: fact-check + scam check run in parallel.
+        // submitClaim calls POST /api/v1/factcheck (the full debate pipeline).
+        // checkScam calls POST /api/v1/scam/check.
         const claimPayload = tab === 'url'
           ? { source_type: 'url', url }
           : { source_type: 'text', text }
+        // Scam check gets the raw URL/text (capped at 2000 chars to stay within limits)
         const textToCheck = (tab === 'url' ? url : text).slice(0, 2000)
 
+        // Both API calls fire simultaneously — neither waits for the other
         const [factRes, scamRes] = await Promise.allSettled([
           submitClaim(claimPayload),
           checkScam({ text: textToCheck }),
         ])
 
+        // factRes.value.report is the full ReportOut Pydantic model from the backend.
+        // Fall back to MOCK_FACT if the API is down.
         setFactResult(factRes.status === 'fulfilled' ? (factRes.value.report ?? MOCK_FACT) : MOCK_FACT)
         setScamResult(scamRes.status === 'fulfilled' ? scamRes.value : MOCK_SCAM)
       }
 
     } catch {
+      // Unexpected error (e.g. network completely down) — show both mocks
       setFactResult(MOCK_FACT)
       setScamResult(MOCK_SCAM)
     } finally {

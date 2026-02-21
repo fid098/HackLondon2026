@@ -1,19 +1,72 @@
 """
 scam.py — Phase 6 Scam Detection + Feedback endpoints.
 
+DEVELOPER: Ishaan
+─────────────────────────────────────────────────────────────────────────────
+This file owns the scam / phishing detection and user feedback endpoints.
+
 Routes:
-  POST /api/v1/scam/check  — RoBERTa + XGBoost scam/phishing classifier (via Gemini Pro)
-  POST /api/v1/feedback    — persist user verdict feedback to MongoDB
+  POST /api/v1/scam/check  — dual-model ensemble scam classifier (30/minute)
+  POST /api/v1/feedback    — user thumbs up/down feedback for any report
 
-Scam check:
-  Single Gemini Pro call that simulates a dual-model ensemble.
-  Returns is_scam, confidence (0–1), per-model scores, scam_type, and reasoning.
-  No authentication required — anyone can check text.
+HOW THE SCAM CHECK WORKS
+─────────────────────────
+1. Frontend sends text (the URL, the claim text, or audio filename) as { text: "..." }.
+2. The text is truncated to 2000 chars and injected into the _SCAM_PROMPT template.
+3. Gemini Pro simulates a RoBERTa + XGBoost dual-model ensemble and returns JSON.
+4. The JSON is parsed by _parse_scam_json() and validated into a Pydantic model.
+5. If parsing fails, a safe fallback (is_scam=False, confidence=0.5) is returned.
 
-Feedback:
-  Accepts thumbs_up/thumbs_down + optional notes for any report.
-  Stores to the `feedback` MongoDB collection.
-  No authentication required — public feedback encouraged.
+DUAL-MODEL ENSEMBLE EXPLAINED
+──────────────────────────────
+In a real production system, the ensemble would be:
+  RoBERTa  — transformer fine-tuned on phishing email / scam message datasets.
+             Good at understanding intent and deceptive language patterns.
+  XGBoost  — gradient-boosted trees on hand-crafted NLP features such as:
+             URL entropy, urgency word count, domain age, header anomalies,
+             number of exclamation marks, presence of financial keywords.
+
+The model_scores returned (roberta, xgboost) reflect what each model would
+have given individually. The final is_scam uses both in a weighted vote.
+Currently, Gemini Pro simulates both models in a single prompt call.
+
+SCAM TYPES DETECTED
+────────────────────
+  phishing       — fake login pages, credential harvesting links
+  advance_fee    — Nigerian prince, lottery winnings, overpayment
+  impersonation  — fake banks, HMRC, Amazon, PayPal, etc.
+  lottery        — "You've won!" prizes you never entered
+  romance        — dating site money transfer requests
+  investment     — crypto / forex pump-and-dump schemes
+  other          — anything suspicious that doesn't fit above
+
+WHAT TO IMPROVE (your tasks as Ishaan)
+────────────────────────────────────────
+- Real RoBERTa model: download roberta-base-openai-detector from HuggingFace
+  and run it locally via a transformers pipeline for offline classification.
+- URL feature extraction: if text contains a URL, resolve it, check domain age
+  via WHOIS, and compare against phishing blacklists (PhishTank API is free).
+- Feedback loop: aggregate thumbs_up / thumbs_down from the `feedback` collection
+  to fine-tune the scam prompt or adjust per-category confidence thresholds.
+- Add rate limit to /api/v1/feedback: currently unlimited — add 100/minute.
+
+TESTING YOUR CHANGES
+─────────────────────
+  cd apps/backend
+  pytest tests/test_scam.py -v
+  pytest tests/test_rate_limit.py -v      # confirm 30/minute limit enforced
+
+  # Scam check — obvious scam text:
+  curl -X POST http://localhost:8000/api/v1/scam/check \\
+    -H 'Content-Type: application/json' \\
+    -d '{"text": "URGENT: Your account is suspended. Click here to verify: http://paypa1.com"}'
+
+  # Feedback:
+  curl -X POST http://localhost:8000/api/v1/feedback \\
+    -H 'Content-Type: application/json' \\
+    -d '{"report_id": "abc123", "rating": "thumbs_down", "notes": "Wrong verdict"}'
+
+No authentication required for either endpoint — public by design.
 """
 
 import json
