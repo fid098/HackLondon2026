@@ -19,6 +19,7 @@ import FactCheck from './pages/FactCheck'
 import Heatmap from './pages/Heatmap'
 import Landing from './pages/Landing'
 import Reports from './pages/Reports'
+import Scam from './pages/Scam'
 import { getMe, getToken, logout } from './lib/api'
 
 const PAGES = {
@@ -27,6 +28,7 @@ const PAGES = {
   heatmap:   Heatmap,
   reports:   Reports,
   deepfake:  Deepfake,
+  scam:      Scam,
 }
 
 export default function App() {

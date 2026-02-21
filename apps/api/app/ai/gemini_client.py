@@ -101,6 +101,12 @@ _MOCK_RESPONSES: dict[str, str] = {
         '{"verdict": "UNVERIFIED", "confidence": 30, '
         '"summary": "[MOCK] Quick triage complete — no real analysis in mock mode."}'
     ),
+    "scam_check": (
+        '{"is_scam": false, "confidence": 0.15, '
+        '"model_scores": {"roberta": 0.12, "xgboost": 0.18}, '
+        '"scam_type": null, '
+        '"reasoning": "[MOCK] No real detection performed — mock mode active."}'
+    ),
 }
 
 

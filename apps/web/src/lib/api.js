@@ -204,3 +204,23 @@ export async function analyzeDeepfakeAudio(payload) {
 export async function analyzeDeepfakeVideo(payload) {
   return post('/api/v1/deepfake/video', payload)
 }
+
+/* ─── scam detection ──────────────────────────────────────────────────────────── */
+
+/**
+ * Analyse text for scam / phishing indicators (RoBERTa + XGBoost ensemble).
+ * @param {{ text: string }} payload
+ * @returns {Promise<{ is_scam: boolean, confidence: number, model_scores: {roberta, xgboost}, scam_type: string|null, reasoning: string }>}
+ */
+export async function checkScam(payload) {
+  return post('/api/v1/scam/check', payload)
+}
+
+/**
+ * Submit thumbs_up / thumbs_down feedback for any report.
+ * @param {{ report_id: string, rating: 'thumbs_up'|'thumbs_down', notes?: string }} payload
+ * @returns {Promise<{ ok: boolean, id: string }>}
+ */
+export async function submitFeedback(payload) {
+  return post('/api/v1/feedback', payload)
+}
