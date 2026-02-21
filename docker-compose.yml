@@ -1,13 +1,13 @@
 # docker-compose.yml — Local development environment
 #
-# Runs: MongoDB + FastAPI backend + React web app
+# Runs: MongoDB + FastAPI backend + React frontend web app
 # All services communicate over the 'truthguard' bridge network.
-# Hot-reload is enabled for both api and web.
+# Hot-reload is enabled for both backend and frontend.
 #
 # Usage:
 #   docker compose up          # start everything
 #   docker compose up --build  # rebuild images first
-#   docker compose up api      # start just the API (+ dependencies)
+#   docker compose up backend  # start just the API (+ dependencies)
 
 services:
   # ─────────────────────────────────────────────
@@ -36,14 +36,14 @@ services:
       - truthguard
 
   # ─────────────────────────────────────────────
-  # FastAPI Backend
+  # FastAPI Backend  (apps/backend/)
   # ─────────────────────────────────────────────
-  api:
+  backend:
     build:
-      context: ./apps/api
+      context: ./apps/backend
       dockerfile: Dockerfile
       target: development
-    container_name: truthguard_api
+    container_name: truthguard_backend
     restart: unless-stopped
     ports:
       - "8000:8000"
@@ -54,45 +54,45 @@ services:
       AI_MOCK_MODE: "true"
       CORS_ORIGINS_STR: "http://localhost:5173,http://localhost:3000"
     env_file:
-      # Optional: override env vars locally (see apps/api/.env.example)
-      - path: ./apps/api/.env
+      # Optional: override env vars locally (see apps/backend/.env.example)
+      - path: ./apps/backend/.env
         required: false
     depends_on:
       mongo:
         condition: service_healthy
     volumes:
       # Mount source for hot-reload; exclude __pycache__
-      - ./apps/api:/app
+      - ./apps/backend:/app
       - /app/__pycache__
     networks:
       - truthguard
 
   # ─────────────────────────────────────────────
-  # React Web App (Vite dev server)
+  # React Frontend App (Vite dev server)  (apps/frontend/)
   # ─────────────────────────────────────────────
-  web:
+  frontend:
     build:
-      context: ./apps/web
+      context: ./apps/frontend
       dockerfile: Dockerfile
       target: development
-    container_name: truthguard_web
+    container_name: truthguard_frontend
     restart: unless-stopped
     ports:
       - "5173:5173"
     environment:
       VITE_API_URL: http://localhost:8000
     volumes:
-      - ./apps/web:/app
+      - ./apps/frontend:/app
       # Preserve the container's node_modules (avoids host/container conflicts)
-      - web_node_modules:/app/node_modules
+      - frontend_node_modules:/app/node_modules
     depends_on:
-      - api
+      - backend
     networks:
       - truthguard
 
 volumes:
   mongo_data:
-  web_node_modules:
+  frontend_node_modules:
 
 networks:
   truthguard:

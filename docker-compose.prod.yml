@@ -27,20 +27,20 @@ services:
       # Uncomment once TLS certs are provisioned (e.g., certbot):
       # - ./infra/nginx/certs:/etc/nginx/certs:ro
     depends_on:
-      - api
-      - web
+      - backend
+      - frontend
     networks:
       - truthguard_prod
 
   # ─────────────────────────────────────────────
-  # FastAPI Backend
+  # FastAPI Backend  (apps/backend/)
   # ─────────────────────────────────────────────
-  api:
+  backend:
     build:
-      context: ./apps/api
+      context: ./apps/backend
       dockerfile: Dockerfile
       target: production
-    container_name: truthguard_api
+    container_name: truthguard_backend
     restart: unless-stopped
     expose:
       - "8000"
@@ -48,7 +48,7 @@ services:
       ENVIRONMENT: production
       AI_MOCK_MODE: "false"
     env_file:
-      - ./apps/api/.env  # MUST exist in prod — contains Atlas URI, Gemini key, etc.
+      - ./apps/backend/.env  # MUST exist in prod — contains Atlas URI, Gemini key, etc.
     deploy:
       resources:
         limits:
@@ -58,14 +58,14 @@ services:
       - truthguard_prod
 
   # ─────────────────────────────────────────────
-  # React Web App (pre-built static files served by Nginx)
+  # React Frontend (pre-built static files served by Nginx)  (apps/frontend/)
   # ─────────────────────────────────────────────
-  web:
+  frontend:
     build:
-      context: ./apps/web
+      context: ./apps/frontend
       dockerfile: Dockerfile
       target: production
-    container_name: truthguard_web
+    container_name: truthguard_frontend
     restart: unless-stopped
     expose:
       - "80"
