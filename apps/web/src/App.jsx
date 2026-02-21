@@ -14,21 +14,17 @@
 import { useEffect, useState } from 'react'
 import AuthModal from './components/AuthModal'
 import Navbar from './components/Navbar'
-import Deepfake from './pages/Deepfake'
-import FactCheck from './pages/FactCheck'
+import Analyze from './pages/Analyze'
 import Heatmap from './pages/Heatmap'
 import Landing from './pages/Landing'
 import Reports from './pages/Reports'
-import Scam from './pages/Scam'
 import { getMe, getToken, logout } from './lib/api'
 
 const PAGES = {
-  home:      Landing,
-  factcheck: FactCheck,
-  heatmap:   Heatmap,
-  reports:   Reports,
-  deepfake:  Deepfake,
-  scam:      Scam,
+  home:    Landing,
+  analyze: Analyze,
+  heatmap: Heatmap,
+  reports: Reports,
 }
 
 export default function App() {

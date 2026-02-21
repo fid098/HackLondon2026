@@ -20,9 +20,9 @@ describe('Landing page', () => {
     expect(screen.getByText(/HackLondon 2026/)).toBeInTheDocument()
   })
 
-  it('renders the Start Fact Checking CTA', () => {
+  it('renders the Start Analysing CTA', () => {
     setup()
-    expect(screen.getByText(/Start Fact Checking/i)).toBeInTheDocument()
+    expect(screen.getByText(/Start Analysing/i)).toBeInTheDocument()
   })
 
   it('renders the View Live Heatmap CTA', () => {
@@ -30,10 +30,10 @@ describe('Landing page', () => {
     expect(screen.getByText(/View Live Heatmap/i)).toBeInTheDocument()
   })
 
-  it('navigates to factcheck when primary CTA is clicked', () => {
+  it('navigates to analyze when primary CTA is clicked', () => {
     const { onNavigate } = setup()
-    fireEvent.click(screen.getByText(/Start Fact Checking/i))
-    expect(onNavigate).toHaveBeenCalledWith('factcheck')
+    fireEvent.click(screen.getByText(/Start Analysing/i))
+    expect(onNavigate).toHaveBeenCalledWith('analyze')
   })
 
   it('navigates to heatmap when secondary CTA is clicked', () => {
@@ -44,16 +44,16 @@ describe('Landing page', () => {
 
   it('renders 3 feature cards', () => {
     setup()
-    expect(screen.getByText('AI Agent Debate')).toBeInTheDocument()
+    expect(screen.getByText('AI Analysis Suite')).toBeInTheDocument()
     expect(screen.getByText('Live Heatmap')).toBeInTheDocument()
     expect(screen.getByText('Report Archive')).toBeInTheDocument()
   })
 
-  it('navigates to factcheck when AI Agent Debate card is clicked', () => {
+  it('navigates to analyze when AI Analysis Suite card is clicked', () => {
     const { onNavigate } = setup()
-    const card = screen.getByText('AI Agent Debate').closest('div[class*="rounded"]')
+    const card = screen.getByText('AI Analysis Suite').closest('div[class*="rounded"]')
     if (card) fireEvent.click(card)
-    expect(onNavigate).toHaveBeenCalledWith('factcheck')
+    expect(onNavigate).toHaveBeenCalledWith('analyze')
   })
 
   it('renders the pipeline section heading', () => {

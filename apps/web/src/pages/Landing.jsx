@@ -13,11 +13,11 @@
 const FEATURES = [
   {
     icon:        '🤖',
-    title:       'AI Agent Debate',
-    description: 'Two opposing Gemini 1.5 Pro agents research and debate any claim. A third "Judge" agent synthesizes a verdict with cited sources and confidence scores.',
+    title:       'AI Analysis Suite',
+    description: 'One tab for everything: fact-check claims with a multi-agent debate, detect deepfakes in images/audio/video, and scan for scams — all running in parallel.',
     accent:      { color: '#10b981', dim: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.18)' },
     tag:         'Core Feature',
-    page:        'factcheck',
+    page:        'analyze',
   },
   {
     icon:        '🗺️',
@@ -95,9 +95,9 @@ export default function Landing({ onNavigate }) {
           <div className="flex flex-wrap items-center justify-center gap-4 pt-1">
             <button
               className="btn-primary text-base px-9 py-4"
-              onClick={() => onNavigate('factcheck')}
+              onClick={() => onNavigate('analyze')}
             >
-              Start Fact Checking →
+              Start Analysing →
             </button>
             <button
               className="btn-secondary text-base px-9 py-4"

@@ -24,42 +24,30 @@ describe('Navbar', () => {
     expect(screen.getByText('TruthGuard')).toBeInTheDocument()
   })
 
-  it('renders 5 nav items: Fact Check, Heatmap, Reports, Deepfake, Scam Check', () => {
+  it('renders 3 nav items: Analyze, Heatmap, Reports', () => {
     setup()
-    expect(screen.getByText('Fact Check')).toBeInTheDocument()
+    expect(screen.getByText('Analyze')).toBeInTheDocument()
     expect(screen.getByText('Heatmap')).toBeInTheDocument()
     expect(screen.getByText('Reports')).toBeInTheDocument()
-    expect(screen.getByText('Deepfake')).toBeInTheDocument()
-    expect(screen.getByText('Scam Check')).toBeInTheDocument()
   })
 
-  it('does not render Settings nav item', () => {
+  it('does not render standalone Fact Check, Deepfake or Scam Check nav items', () => {
     setup()
-    expect(screen.queryByText(/settings/i)).toBeNull()
-  })
-
-  it('calls onNavigate("deepfake") when Deepfake is clicked', () => {
-    const { onNavigate } = setup()
-    fireEvent.click(screen.getByText('Deepfake'))
-    expect(onNavigate).toHaveBeenCalledWith('deepfake')
-  })
-
-  it('calls onNavigate("scam") when Scam Check is clicked', () => {
-    const { onNavigate } = setup()
-    fireEvent.click(screen.getByText('Scam Check'))
-    expect(onNavigate).toHaveBeenCalledWith('scam')
+    expect(screen.queryByText('Fact Check')).toBeNull()
+    expect(screen.queryByText('Deepfake')).toBeNull()
+    expect(screen.queryByText('Scam Check')).toBeNull()
   })
 
   it('calls onNavigate("home") when the logo is clicked', () => {
-    const { onNavigate } = setup('factcheck')
+    const { onNavigate } = setup('analyze')
     fireEvent.click(screen.getByLabelText('TruthGuard home'))
     expect(onNavigate).toHaveBeenCalledWith('home')
   })
 
-  it('calls onNavigate with correct id when Fact Check is clicked', () => {
+  it('calls onNavigate("analyze") when Analyze is clicked', () => {
     const { onNavigate } = setup()
-    fireEvent.click(screen.getByText('Fact Check'))
-    expect(onNavigate).toHaveBeenCalledWith('factcheck')
+    fireEvent.click(screen.getByText('Analyze'))
+    expect(onNavigate).toHaveBeenCalledWith('analyze')
   })
 
   it('calls onNavigate("heatmap") when Heatmap is clicked', () => {
@@ -82,8 +70,8 @@ describe('Navbar', () => {
 
   it('does not set aria-current on inactive nav buttons', () => {
     setup('heatmap')
-    const factCheckBtn = screen.getByText('Fact Check').closest('button')
-    expect(factCheckBtn).not.toHaveAttribute('aria-current')
+    const analyzeBtn = screen.getByText('Analyze').closest('button')
+    expect(analyzeBtn).not.toHaveAttribute('aria-current')
   })
 
   it('shows Sign In button when no user is logged in', () => {

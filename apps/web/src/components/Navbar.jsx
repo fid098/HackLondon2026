@@ -16,11 +16,9 @@
 import { useState } from 'react'
 
 const NAV_ITEMS = [
-  { id: 'factcheck', label: 'Fact Check'  },
-  { id: 'heatmap',   label: 'Heatmap'     },
-  { id: 'reports',   label: 'Reports'     },
-  { id: 'deepfake',  label: 'Deepfake'    },
-  { id: 'scam',      label: 'Scam Check'  },
+  { id: 'analyze', label: 'Analyze' },
+  { id: 'heatmap', label: 'Heatmap' },
+  { id: 'reports', label: 'Reports' },
 ]
 
 export default function Navbar({ currentPage, onNavigate, user, onLogin, onLogout }) {
