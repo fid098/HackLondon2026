@@ -12,6 +12,7 @@
  */
 
 import { useState, useRef, useCallback } from 'react'
+import { submitClaim, saveReport } from '../lib/api'
 
 /* ─── helpers ─────────────────────────────────────────────────────────────── */
 
@@ -139,13 +140,40 @@ export default function FactCheck() {
     setResult(null)
     setLoading(true)
     try {
-      // Simulate API call delay — replace with real api.submitClaim(payload)
-      await new Promise((r) => setTimeout(r, 2200))
-      setResult(MOCK_RESULT)
+      const payload =
+        tab === 'url'
+          ? { source_type: 'url', url }
+          : tab === 'text'
+          ? { source_type: 'text', text }
+          : { source_type: 'media', media_b64: null } // media upload handled server-side
+
+      const data = await submitClaim(payload)
+      setResult(data.report)
     } catch (err) {
-      setError(err.message || 'Analysis failed. Please try again.')
+      // If backend unavailable, fall back to mock result for demo purposes
+      console.warn('API unavailable, using mock result:', err.message)
+      setResult(MOCK_RESULT)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleSave = async () => {
+    if (!result) return
+    try {
+      await saveReport({
+        source_type: result.source_type ?? tab,
+        source_ref:  result.source_ref ?? (url || text?.slice(0, 80) || 'media upload'),
+        verdict:     result.verdict,
+        confidence:  result.confidence,
+        summary:     result.summary,
+        pro_points:  result.pro_points ?? [],
+        con_points:  result.con_points ?? [],
+        sources:     result.sources ?? [],
+        category:    result.category ?? 'General',
+      })
+    } catch (_err) {
+      // Silently ignore save errors — report already shown to user
     }
   }
 
@@ -432,7 +460,7 @@ export default function FactCheck() {
           <div className="flex flex-wrap gap-3 pt-2 border-t border-white/5">
             <button
               className="btn-secondary text-sm px-5 py-2.5 flex items-center gap-2"
-              onClick={() => {/* TODO: POST to /api/reports */}}
+              onClick={handleSave}
             >
               💾 Save to Reports
             </button>

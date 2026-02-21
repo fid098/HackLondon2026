@@ -1,6 +1,13 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { describe, it, expect, vi, beforeAll } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import Reports from '../Reports'
+
+// Prevent real network calls — let the catch branch do client-side mock filtering
+vi.mock('../../lib/api', () => ({
+  getReports: vi.fn(() => Promise.reject(new Error('No API in tests'))),
+  submitClaim: vi.fn(),
+  saveReport: vi.fn(),
+}))
 
 function setup() {
   const onNavigate = vi.fn()
@@ -29,40 +36,43 @@ describe('Reports page', () => {
     expect(screen.getByPlaceholderText(/Search reports/i)).toBeInTheDocument()
   })
 
-  it('shows report cards on initial load', () => {
+  it('shows report cards on initial load', async () => {
     setup()
-    // At least one report title should be visible
-    expect(screen.getByText(/5G towers/i)).toBeInTheDocument()
+    // Wait for mock fallback to settle
+    await waitFor(() => expect(screen.getByText(/5G towers/i)).toBeInTheDocument())
   })
 
-  it('filters reports by search query', () => {
+  it('filters reports by search query', async () => {
     setup()
     const input = screen.getByPlaceholderText(/Search reports/i)
     fireEvent.change(input, { target: { value: 'Bitcoin' } })
-    expect(screen.getByText(/Central banks/i)).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText(/Central banks/i)).toBeInTheDocument())
     expect(screen.queryByText(/5G towers/i)).toBeNull()
   })
 
-  it('filters reports by verdict tab', () => {
+  it('filters reports by verdict tab', async () => {
     setup()
+    // Wait for initial mock data to load
+    await waitFor(() => expect(screen.getByText(/5G towers/i)).toBeInTheDocument())
     // Click "True" filter — should only show TRUE verdict reports
     const trueBtn = screen.getAllByText('True').find((el) => el.closest('button'))
     fireEvent.click(trueBtn)
-    expect(screen.getByText(/Antarctic ice sheet/i)).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText(/Antarctic ice sheet/i)).toBeInTheDocument())
     expect(screen.queryByText(/5G towers/i)).toBeNull()
   })
 
-  it('shows empty state when nothing matches', () => {
+  it('shows empty state when nothing matches', async () => {
     setup()
     const input = screen.getByPlaceholderText(/Search reports/i)
     fireEvent.change(input, { target: { value: 'xyzzy_no_match_at_all' } })
-    expect(screen.getByText('No reports found')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText('No reports found')).toBeInTheDocument())
   })
 
-  it('empty state has a Start Fact Checking button that navigates', () => {
+  it('empty state has a Start Fact Checking button that navigates', async () => {
     const { onNavigate } = setup()
     const input = screen.getByPlaceholderText(/Search reports/i)
     fireEvent.change(input, { target: { value: 'xyzzy_no_match_at_all' } })
+    await waitFor(() => screen.getByText(/Start Fact Checking/i))
     fireEvent.click(screen.getByText(/Start Fact Checking/i))
     expect(onNavigate).toHaveBeenCalledWith('factcheck')
   })

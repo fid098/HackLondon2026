@@ -39,7 +39,8 @@ class TestGeminiClientMockMode:
     @pytest.mark.asyncio
     async def test_generate_uses_response_key(self):
         result = await self.client.generate("any prompt", response_key="debate_pro")
-        assert "MOCK PRO AGENT" in result
+        # debate_pro mock now uses ARGUMENT: / POINTS: format
+        assert "ARGUMENT:" in result or "supporting arguments" in result
 
     @pytest.mark.asyncio
     async def test_generate_unknown_key_returns_default(self):
@@ -59,7 +60,8 @@ class TestGeminiClientMockMode:
     @pytest.mark.asyncio
     async def test_judge_response_key(self):
         result = await self.client.generate("judge prompt", response_key="judge")
-        assert "VERDICT" in result
+        # judge mock now returns JSON with "verdict" key
+        assert "verdict" in result
 
     @pytest.mark.asyncio
     async def test_deepfake_image_response_key(self):
