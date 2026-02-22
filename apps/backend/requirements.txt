@@ -6,8 +6,8 @@ motor==3.5.0           # Async MongoDB driver (wraps pymongo with asyncio)
 pymongo==4.8.0         # Sync driver (used by motor internally + for scripts)
 
 
-pydantic[email]==2.8.2
-pydantic-settings==2.3.4
+pydantic[email]>=2.10.0
+pydantic-settings>=2.5.0
 
 
 python-jose[cryptography]==3.3.0
@@ -26,7 +26,8 @@ python-multipart==0.0.9
 python-dotenv==1.0.1
 
 
-google-generativeai==0.7.2
+google-generativeai>=0.8.0
+protobuf>=5.29.0,<6.0.0
 
 
 pytest==8.3.2

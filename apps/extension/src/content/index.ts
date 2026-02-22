@@ -52,6 +52,7 @@ interface RuntimeResponse<T> {
 interface ExtensionSettings {
   redFlagEnabled?: boolean
   meetingModeEnabled?: boolean
+  apiBase?: string
 }
 
 interface VideoRiskState {
@@ -76,6 +77,7 @@ interface MeetingModeStatus {
 
 let _redFlagEnabled = true
 let _meetingModeEnabled = false
+let _apiBase = 'http://localhost:8000'
 let _sampledMeetingFrames = 0
 let _latestMeetingRiskScore: number | null = null
 let _latestMeetingLabel: DeepfakeFrameResult['label'] = 'UNVERIFIED'
@@ -107,6 +109,9 @@ if (isExtensionAlive()) {
       }
       if (typeof res.data.meetingModeEnabled === 'boolean') {
         _meetingModeEnabled = res.data.meetingModeEnabled
+      }
+      if (typeof res.data.apiBase === 'string' && res.data.apiBase) {
+        _apiBase = res.data.apiBase.replace(/\/+$/, '')
       }
     })
   } catch {
@@ -233,28 +238,33 @@ function sendAnalyzeVideoFrame(
   payload: VideoFramePayload,
   callback: (result: DeepfakeFrameResult | null) => void,
 ): void {
-  if (!isExtensionAlive()) {
-    callback(null)
-    return
-  }
-  try {
-    chrome.runtime.sendMessage(
-      { type: 'ANALYZE_VIDEO_FRAME', payload },
-      (response: RuntimeResponse<DeepfakeFrameResult>) => {
-        if (chrome.runtime.lastError) {
-          callback(null)
-          return
-        }
-        if (response?.ok && response.data) {
-          callback(response.data)
-          return
-        }
-        callback(null)
-      },
-    )
-  } catch {
-    callback(null)
-  }
+  // Call the deepfake API directly from the content script to avoid MV3
+  // service-worker port timeouts on long-running Gemini requests.
+  fetch(`${_apiBase}/api/v1/deepfake/image`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      image_b64: payload.frameB64,
+      filename: `${payload.platform || 'video'}-frame.jpg`,
+    }),
+    signal: AbortSignal.timeout(45000),
+  })
+    .then((res) => {
+      if (!res.ok) { callback(null); return }
+      return res.json()
+    })
+    .then((data?: { is_deepfake?: boolean; confidence?: number; reasoning?: string }) => {
+      if (!data) { callback(null); return }
+      const norm = Math.max(0, Math.min(1, Number(data.confidence ?? 0)))
+      const pct = Math.round(norm * 100)
+      callback({
+        label: data.is_deepfake ? 'SUSPECTED_FAKE' : 'REAL',
+        confidence: pct,
+        deepfakeScore: data.is_deepfake ? pct : (100 - pct),
+        explainability: data.reasoning ?? 'Frame analysis complete.',
+      })
+    })
+    .catch(() => callback(null))
 }
 
 function platformNameFromHost(host: string): string {

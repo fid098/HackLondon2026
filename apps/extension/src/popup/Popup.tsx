@@ -257,6 +257,14 @@ export default function Popup() {
         setStatus(health.connected ? 'connected' : 'disconnected')
         setDbStatus(health.database)
 
+        // Push persisted settings to the content script so it starts with the
+        // correct meetingModeEnabled / redFlagEnabled state immediately.
+        await pushSettingsPatchToActiveTab({
+          enabled: loaded.enabled,
+          redFlagEnabled: loaded.redFlagEnabled,
+          meetingModeEnabled: loaded.meetingModeEnabled,
+        })
+
         const liveMeeting = await refreshMeetingStatus(false)
         if (!cancelled) setMeetingStatus(liveMeeting)
       } catch {
