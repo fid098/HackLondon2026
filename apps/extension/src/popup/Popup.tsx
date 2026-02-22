@@ -79,15 +79,15 @@ const DEFAULT_SETTINGS: Settings = {
 // ── Colour constants (replaces Tailwind/CSS variables in popup context) ────────
 
 const C = {
-  bg:       '#0f172a',           // page background
+  bg:       '#04040a',           // matches web app --bg-base
   surface:  'rgba(255,255,255,0.04)',
   border:   'rgba(255,255,255,0.08)',
   text:     '#f1f5f9',           // primary text
   muted:    '#64748b',           // secondary text
-  accent:   '#34d399',           // emerald green — used for "ON" state and brand
-  violet:   '#818cf8',           // indigo — used for "Analyse" button
-  red:      '#ef4444',           // red — used for "OFF" state and errors
-  amber:    '#f59e0b',           // amber — unused currently, available for warnings
+  brand:    '#ef4444',           // red — brand accent (logo, buttons, active states)
+  green:    '#10b981',           // green — semantic "ON" / healthy state only
+  red:      '#ef4444',           // red — "OFF" state and errors
+  amber:    '#f59e0b',           // amber — available for warnings
 } as const
 
 // Maps verdict strings from the API to highlight colours in the result card
@@ -198,15 +198,15 @@ export default function Popup() {
   const vColor = result ? (VERDICT_COLORS[result.verdict] ?? C.muted) : C.muted
 
   return (
-    <div style={{ width: 320, padding: 16, fontFamily: 'system-ui,-apple-system,sans-serif', background: C.bg, color: C.text, minHeight: 220 }}>
+    <div style={{ width: 320, padding: 16, fontFamily: "'Inter', system-ui, -apple-system, sans-serif", background: C.bg, color: C.text, minHeight: 220 }}>
 
       {/* ── Header: logo + title + ON/OFF toggle ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
         {/* Shield SVG icon */}
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.brand} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
         </svg>
-        <span style={{ fontSize: 17, fontWeight: 700, color: C.accent }}>TruthGuard</span>
+        <span style={{ fontSize: 17, fontWeight: 700, color: C.brand }}>TruthGuard</span>
 
         {/* ON/OFF toggle — right-aligned with marginLeft: auto */}
         <button
@@ -219,7 +219,7 @@ export default function Popup() {
             fontSize: 11,
             fontWeight: 700,
             background: settings.enabled ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.12)',
-            color:      settings.enabled ? C.accent : C.red,
+            color:      settings.enabled ? C.green : C.red,
             border:     `1px solid ${settings.enabled ? 'rgba(16,185,129,0.35)' : 'rgba(239,68,68,0.3)'}`,
             cursor: 'pointer',
           }}
@@ -255,9 +255,9 @@ export default function Popup() {
               style={{
                 flex: 1, padding: '4px 0', borderRadius: 5, fontSize: 11, fontWeight: 600,
                 cursor: 'pointer', textTransform: 'capitalize',
-                background: settings.sensitivity === s ? 'rgba(99,102,241,0.2)' : C.surface,
-                color:      settings.sensitivity === s ? C.violet : C.muted,
-                border:     `1px solid ${settings.sensitivity === s ? 'rgba(99,102,241,0.4)' : C.border}`,
+                background: settings.sensitivity === s ? 'rgba(239,68,68,0.15)' : C.surface,
+                color:      settings.sensitivity === s ? C.brand : C.muted,
+                border:     `1px solid ${settings.sensitivity === s ? 'rgba(239,68,68,0.4)' : C.border}`,
               }}
             >
               {s}
@@ -275,9 +275,10 @@ export default function Popup() {
         style={{
           width: '100%', padding: '7px 0', borderRadius: 7, fontSize: 12,
           fontWeight: 600, cursor: analysing ? 'wait' : 'pointer',
-          background: 'rgba(99,102,241,0.15)', color: C.violet,
-          border: '1px solid rgba(99,102,241,0.35)', marginBottom: 10,
-          opacity: (analysing || !settings.enabled || status !== 'connected') ? 0.45 : 1,
+          background: 'linear-gradient(135deg, rgba(239,68,68,0.85), rgba(185,28,28,0.9))',
+          color: '#fff',
+          border: '1px solid rgba(239,68,68,0.5)', marginBottom: 10,
+          opacity: (analysing || !settings.enabled || status !== 'connected') ? 0.4 : 1,
         }}
       >
         {analysing ? 'Analysing…' : '🔍 Analyse this page'}
@@ -308,14 +309,14 @@ export default function Popup() {
       )}
 
       {/* ── Footer ── */}
-      <div style={{ fontSize: 10, color: '#334155', borderTop: '1px solid #1e293b', paddingTop: 8, marginTop: 10, display: 'flex', justifyContent: 'space-between' }}>
-        <span>Phase 4 · v0.1.0</span>
+      <div style={{ fontSize: 10, color: '#334155', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8, marginTop: 10, display: 'flex', justifyContent: 'space-between' }}>
+        <span>TruthGuard · v0.1.0</span>
         {/* TODO: Make this dynamic — derive from settings.apiBase */}
         <a
           href="http://localhost:5173"
           target="_blank"
           rel="noreferrer"
-          style={{ color: C.violet, textDecoration: 'none' }}
+          style={{ color: C.brand, textDecoration: 'none' }}
         >
           Open Web App ↗
         </a>
