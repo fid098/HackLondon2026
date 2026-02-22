@@ -29,12 +29,15 @@ with the full media data inline (capped at ~11 MB; larger files fall back gracef
 """
 
 import asyncio
+import base64
 import json
 import logging
 import re
 from dataclasses import dataclass, field
 
+from app.ai.cv_deepfake_detector import cv_detector
 from app.ai.gemini_client import gemini_client
+from app.ai.spatial_artifact_detector import spatial_detector
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +128,7 @@ Respond with valid JSON only:
 _IMG_SYNTH_PROMPT = """\
 You are the final adjudicator in a deepfake detection pipeline for an image.
 
-Two specialist probes have already analysed this image:
+Two specialist Gemini probes and two dedicated CV/ML models have already analysed this image:
 
 PROBE A — GAN & Artifact Scan:
   Score: {probe_a_score}/1.0
@@ -139,17 +142,31 @@ PROBE B — Facial Consistency Check:
 {probe_b_findings}
   Summary: {probe_b_summary}
 
-Now examine the image yourself and give the final verdict. Decision rules:
-- Both probes flag artifacts → high confidence fake
-- One probe flags, one clean → moderate confidence; investigate carefully
-- Both probes clean → likely genuine
-- A score ≥ 0.7 on either probe is a strong signal regardless of the other
+CV MODEL (ViT) — AI-Generated Image Detector (umm-maybe, trained on SD/MidJourney/DALL-E/GANs):
+  Label: {cv_label}
+  Score: {cv_score}/1.0  (0 = real/natural, 1 = AI-generated)
+
+SPATIAL CNN (EfficientNet) — Face-Swap Artifact Detector (dima806, trained on face-swap deepfakes):
+  Label: {spatial_label}
+  Score: {spatial_score}/1.0  (0 = no artifacts, 1 = spatial/compositing artifacts detected)
+
+Now examine the image yourself and give the final verdict using majority-vote weighting across all 4 signals:
+
+WEIGHTING RULES (in priority order):
+1. If both Gemini probes score ≥ 0.70 AND both CNN scores < 0.30:
+   → CNNs are likely false negatives for this image type; Trust Gemini; issue FAKE.
+2. If Spatial CNN score ≥ 0.80: face-swap compositing artifacts confirmed; weight strongly for FAKE.
+3. If ViT CV score ≥ 0.80: AI-generated content confirmed; weight strongly for FAKE.
+4. If 3 or 4 signals agree on FAKE (score > 0.5): issue FAKE; confidence scales with agreement strength.
+5. If 3 or 4 signals agree on REAL (score ≤ 0.5): issue REAL; confidence scales with agreement strength.
+6. If signals are split 2-vs-2 or all conflict: issue UNCERTAIN (confidence 40–55).
+7. NEVER let one low-confidence signal override three high-confidence opposing signals.
 
 Respond with valid JSON only:
 {{
   "is_fake": <true|false>,
   "confidence": <0.0 = definitely real, 1.0 = definitely fake>,
-  "reasoning": "2–3 sentences explaining the final verdict with reference to the probe findings"
+  "reasoning": "2–3 sentences explaining the final verdict referencing all four signals"
 }}"""
 
 
@@ -241,7 +258,7 @@ Respond with valid JSON only:
 _VID_SYNTH_PROMPT = """\
 You are the final adjudicator in a video deepfake detection pipeline.
 
-Three specialist probes have analysed this video:
+Three specialist Gemini probes and two dedicated CV/ML models have analysed this video:
 
 PROBE A — Visual Artifact Scan:
   Score: {probe_a_score}/1.0
@@ -261,13 +278,32 @@ PROBE C — Temporal Consistency Analysis:
 {probe_c_findings}
   Summary: {probe_c_summary}
 
-Now examine the video yourself and give the final verdict.
+CV MODEL (ViT) — AI-Generated Image Detector on keyframe (umm-maybe, trained on SD/MidJourney/DALL-E/GANs):
+  Label: {cv_label}
+  Score: {cv_score}/1.0  (0 = real/natural, 1 = AI-generated)
+
+SPATIAL CNN (EfficientNet) — Face-Swap Artifact Detector on keyframe (dima806, trained on face-swap deepfakes):
+  Label: {spatial_label}
+  Score: {spatial_score}/1.0  (0 = no spatial artifacts, 1 = compositing/face-swap artifacts detected)
+
+Now examine the video yourself and give the final verdict using majority-vote weighting across all 5 signals:
+
+WEIGHTING RULES (in priority order):
+1. If all 3 Gemini probes score ≥ 0.60: strong FAKE consensus from temporal + visual analysis; weight heavily.
+2. If Spatial CNN score ≥ 0.80: face-swap compositing artifacts confirmed in keyframe; weight strongly for FAKE.
+3. If ViT CV score ≥ 0.80: AI-generated frame content confirmed; weight strongly for FAKE.
+4. If both CNN models score ≥ 0.70: pixel-level manipulation confirmed; weight strongly for FAKE.
+5. If 3 or more of the 5 signals agree on FAKE: issue FAKE; confidence scales with agreement strength.
+6. If 4 or more signals agree on REAL (score ≤ 0.5): issue REAL with high confidence.
+7. If CNN keyframe scores are UNCERTAIN (no extractable frame): rely entirely on Gemini probes.
+8. If signals are evenly split with no clear majority: issue UNCERTAIN (confidence 40–55).
+9. NEVER let one low-confidence signal override four high-confidence opposing signals.
 
 Respond with valid JSON only:
 {{
   "is_fake": <true|false>,
   "confidence": <0.0 = definitely real, 1.0 = definitely fake>,
-  "reasoning": "2–3 sentences explaining the final verdict"
+  "reasoning": "2–3 sentences explaining the final verdict referencing the key signals"
 }}"""
 
 
@@ -319,23 +355,31 @@ class DeepfakePipeline:
     # ── Image ──────────────────────────────────────────────────────────────────
 
     async def run_image(self, image_b64: str, mime_type: str = "image/jpeg") -> DeepfakeResult:
-        """Run the 2-probe + synthesiser pipeline on an image."""
+        """Run the 2 Gemini probes + CV model (parallel) + synthesiser pipeline on an image."""
         logger.info("Starting image deepfake pipeline (mime=%s, size=%d chars)", mime_type, len(image_b64))
 
-        # Step 1: run both probes in parallel
-        probe_a_raw, probe_b_raw = await asyncio.gather(
+        # Step 1: run Gemini probes + ViT CV model + Spatial CNN all in parallel
+        probe_a_raw, probe_b_raw, cv_result, spatial_result = await asyncio.gather(
             gemini_client.generate_with_vision(
                 _IMG_ARTIFACT_PROMPT, image_b64, mime_type, response_key="deepfake_probe"
             ),
             gemini_client.generate_with_vision(
                 _IMG_FACIAL_PROMPT, image_b64, mime_type, response_key="deepfake_probe"
             ),
+            cv_detector.detect_image(image_b64),
+            spatial_detector.detect_image(image_b64),
         )
 
         probe_a = _parse_probe(probe_a_raw)
         probe_b = _parse_probe(probe_b_raw)
 
-        # Step 2: synthesiser sees image + probe reports
+        logger.info(
+            "CV model result: label=%s score=%.2f | Spatial CNN: label=%s score=%.2f",
+            cv_result.get("label"), cv_result.get("score", 0.5),
+            spatial_result.get("label"), spatial_result.get("score", 0.5),
+        )
+
+        # Step 2: synthesiser sees image + all four probe reports
         synth_prompt = _IMG_SYNTH_PROMPT.format(
             probe_a_score=round(_clamp(probe_a.get("score", 0.5)), 2),
             probe_a_findings=_fmt_findings(probe_a.get("findings", [])),
@@ -343,6 +387,10 @@ class DeepfakePipeline:
             probe_b_score=round(_clamp(probe_b.get("score", 0.5)), 2),
             probe_b_findings=_fmt_findings(probe_b.get("findings", [])),
             probe_b_summary=probe_b.get("summary", ""),
+            cv_label=cv_result.get("label", "UNCERTAIN"),
+            cv_score=round(_clamp(cv_result.get("score", 0.5)), 2),
+            spatial_label=spatial_result.get("label", "UNCERTAIN"),
+            spatial_score=round(_clamp(spatial_result.get("score", 0.5)), 2),
         )
         synth_raw = await gemini_client.generate_with_vision(
             synth_prompt, image_b64, mime_type, response_key="deepfake_image"
@@ -359,6 +407,18 @@ class DeepfakePipeline:
                 name="Facial Consistency Check",
                 finding=probe_b.get("summary", "Inconclusive."),
                 score=_clamp(probe_b.get("score", 0.5)),
+            ),
+            AnalysisStage(
+                name="ViT AI-Image Classifier",
+                finding=f"ViT (umm-maybe): {cv_result.get('label', 'UNCERTAIN')} "
+                        f"({cv_result.get('score', 0.5):.0%} AI-generated probability)",
+                score=_clamp(cv_result.get("score", 0.5)),
+            ),
+            AnalysisStage(
+                name="Spatial Artifact CNN",
+                finding=f"EfficientNet (dima806): {spatial_result.get('label', 'UNCERTAIN')} "
+                        f"({spatial_result.get('score', 0.5):.0%} face-swap artifact probability)",
+                score=_clamp(spatial_result.get("score", 0.5)),
             ),
             AnalysisStage(
                 name="Synthesis Verdict",
@@ -442,12 +502,54 @@ class DeepfakePipeline:
 
     # ── Video ──────────────────────────────────────────────────────────────────
 
+    async def _extract_jpeg_frame(self, video_b64: str) -> str | None:
+        """
+        Extract the first JPEG keyframe from raw video bytes.
+        MP4/WebM containers embed JPEG-encoded frames detectable by the
+        JPEG SOI marker (0xFF 0xD8 0xFF). Returns base64 frame or None.
+        """
+        try:
+            raw = base64.b64decode(video_b64)
+            jpeg_start = raw.find(b"\xff\xd8\xff")
+            if jpeg_start == -1:
+                logger.debug("No JPEG keyframe found in video bytes.")
+                return None
+            jpeg_end = raw.find(b"\xff\xd9", jpeg_start)
+            if jpeg_end == -1:
+                return None
+            frame_bytes = raw[jpeg_start: jpeg_end + 2]
+            return base64.b64encode(frame_bytes).decode()
+        except Exception as exc:
+            logger.debug("JPEG frame extraction failed: %s", exc)
+            return None
+
+    async def _cv_video_best_effort(self, video_b64: str) -> dict:
+        """
+        Best-effort ViT CV analysis on the first extractable JPEG keyframe.
+        Returns neutral UNCERTAIN score if no frame can be extracted.
+        """
+        frame_b64 = await self._extract_jpeg_frame(video_b64)
+        if frame_b64 is None:
+            return {"score": 0.5, "label": "UNCERTAIN"}
+        return await cv_detector.detect_image(frame_b64)
+
+    async def _spatial_video_best_effort(self, video_b64: str) -> dict:
+        """
+        Best-effort Spatial CNN analysis on the first extractable JPEG keyframe.
+        Detects face-swap compositing artifacts in video frames.
+        Returns neutral UNCERTAIN score if no frame can be extracted.
+        """
+        frame_b64 = await self._extract_jpeg_frame(video_b64)
+        if frame_b64 is None:
+            return {"score": 0.5, "label": "UNCERTAIN"}
+        return await spatial_detector.detect_image(frame_b64)
+
     async def run_video(self, video_b64: str, mime_type: str = "video/mp4") -> DeepfakeResult:
-        """Run the 3-probe + synthesiser pipeline on a video file."""
+        """Run the 3 Gemini probes + CV frame analysis + synthesiser pipeline on a video."""
         logger.info("Starting video deepfake pipeline (mime=%s, size=%d chars)", mime_type, len(video_b64))
 
-        # 3 probes in parallel: visual artifacts, facial consistency, temporal
-        probe_a_raw, probe_b_raw, probe_c_raw = await asyncio.gather(
+        # 3 Gemini probes + ViT CV model + Spatial CNN — all 5 in parallel
+        probe_a_raw, probe_b_raw, probe_c_raw, cv_result, spatial_result = await asyncio.gather(
             gemini_client.generate_with_vision(
                 _IMG_ARTIFACT_PROMPT, video_b64, mime_type, response_key="deepfake_probe"
             ),
@@ -457,6 +559,13 @@ class DeepfakePipeline:
             gemini_client.generate_with_vision(
                 _VID_TEMPORAL_PROMPT, video_b64, mime_type, response_key="deepfake_probe"
             ),
+            self._cv_video_best_effort(video_b64),
+            self._spatial_video_best_effort(video_b64),
+        )
+        logger.info(
+            "Video CV frame result: label=%s score=%.2f | Spatial CNN: label=%s score=%.2f",
+            cv_result.get("label"), cv_result.get("score", 0.5),
+            spatial_result.get("label"), spatial_result.get("score", 0.5),
         )
 
         probe_a = _parse_probe(probe_a_raw)
@@ -473,12 +582,29 @@ class DeepfakePipeline:
             probe_c_score=round(_clamp(probe_c.get("score", 0.5)), 2),
             probe_c_findings=_fmt_findings(probe_c.get("findings", [])),
             probe_c_summary=probe_c.get("summary", ""),
+            cv_label=cv_result.get("label", "UNCERTAIN"),
+            cv_score=round(_clamp(cv_result.get("score", 0.5)), 2),
+            spatial_label=spatial_result.get("label", "UNCERTAIN"),
+            spatial_score=round(_clamp(spatial_result.get("score", 0.5)), 2),
         )
         synth_raw = await gemini_client.generate_with_vision(
             synth_prompt, video_b64, mime_type, response_key="deepfake_video"
         )
         synth = _parse_synthesis(synth_raw)
 
+        _has_frame = cv_result.get("label") != "UNCERTAIN"
+        cv_finding = (
+            f"ViT (umm-maybe) on keyframe: {cv_result.get('label', 'UNCERTAIN')} "
+            f"({cv_result.get('score', 0.5):.0%} AI-generated probability)"
+            if _has_frame
+            else "No extractable keyframe — ViT CV model skipped."
+        )
+        spatial_finding = (
+            f"EfficientNet (dima806) on keyframe: {spatial_result.get('label', 'UNCERTAIN')} "
+            f"({spatial_result.get('score', 0.5):.0%} face-swap artifact probability)"
+            if _has_frame
+            else "No extractable keyframe — Spatial CNN skipped."
+        )
         stages = [
             AnalysisStage(
                 name="Visual Artifact Scan",
@@ -494,6 +620,16 @@ class DeepfakePipeline:
                 name="Temporal Consistency Analysis",
                 finding=probe_c.get("summary", "Inconclusive."),
                 score=_clamp(probe_c.get("score", 0.5)),
+            ),
+            AnalysisStage(
+                name="ViT AI-Image Classifier",
+                finding=cv_finding,
+                score=_clamp(cv_result.get("score", 0.5)),
+            ),
+            AnalysisStage(
+                name="Spatial Artifact CNN",
+                finding=spatial_finding,
+                score=_clamp(spatial_result.get("score", 0.5)),
             ),
             AnalysisStage(
                 name="Synthesis Verdict",

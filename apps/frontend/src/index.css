@@ -33,6 +33,30 @@
   ::selection { background: rgba(239, 68, 68, 0.25); }
 }
 
+/* Full-screen Dither background used across all pages */
+.app-shell {
+  position: relative;
+  isolation: isolate;
+}
+
+.app-dither-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.app-dither-vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 22% 12%, rgba(239, 68, 68, 0.16), transparent 52%),
+    radial-gradient(circle at 88% 84%, rgba(17, 24, 39, 0.46), transparent 48%),
+    linear-gradient(180deg, rgba(2, 6, 23, 0.72), rgba(2, 6, 23, 0.84));
+}
+
 /* ─── Page transition ────────────────────────────────────────────────────── */
 .page-enter {
   animation: pageEnter 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;

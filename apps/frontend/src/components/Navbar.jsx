@@ -44,32 +44,12 @@ export default function Navbar({ currentPage, onNavigate, user, onLogin, onLogou
           {/* ── Logo ── */}
           <button
             onClick={() => onNavigate('home')}
-            aria-label="Verify home"
-            className="flex items-center gap-2.5 group focus:outline-none"
+            aria-label="Veryfi home"
+            className="flex items-center group focus:outline-none"
           >
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-              style={{
-                background: 'linear-gradient(135deg, #dc2626, #ef4444)',
-                boxShadow:  '0 0 0 0 rgba(239,68,68,0)',
-                transition: 'box-shadow 0.3s',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.boxShadow = '0 0 20px rgba(239,68,68,0.4)')}
-              onMouseLeave={(e) => (e.currentTarget.style.boxShadow = '0 0 0 0 rgba(239,68,68,0)')}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-              </svg>
-            </div>
-
-            <div className="flex flex-col items-start leading-none">
-              <span className="text-[17px] font-bold text-white tracking-tight group-hover:text-red-400 transition-colors">
-                TruthGuard
-              </span>
-              <span className="text-[10px] text-slate-600 tracking-widest uppercase font-medium mt-0.5">
-                Intelligence Platform
-              </span>
-            </div>
+            <span className="text-[30px] font-black leading-none text-white tracking-tight group-hover:text-red-400 transition-colors">
+              Veryfi
+            </span>
           </button>
 
           {/* ── Nav items ── */}

@@ -119,7 +119,7 @@ function injectBadge(el: HTMLElement, verdict: string, confidence: number): void
 
   const badge = document.createElement('div')
   badge.className = `tg-badge ${verdictClass(verdict)}`
-  badge.title = `TruthGuard: ${verdict} - ${confidence}% confidence`
+  badge.title = `Veryfi: ${verdict} - ${confidence}% confidence`
   badge.innerHTML =
     `<span class="tg-badge-icon">[TG]</span>` +
     `<span class="tg-badge-verdict">${verdict}</span>` +
@@ -184,7 +184,7 @@ function showResultBanner(
   header.className = 'tg-result-header'
   header.innerHTML =
     `<span class="tg-badge-icon">[TG]</span>` +
-    `<strong>TruthGuard</strong>` +
+    `<strong>Veryfi</strong>` +
     `<span class="tg-result-verdict">${verdict} - ${confidence}%</span>` +
     `<button class="tg-result-close" id="tg-result-close">x</button>`
   banner.appendChild(header)
