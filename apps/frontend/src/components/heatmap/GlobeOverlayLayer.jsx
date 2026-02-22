@@ -59,7 +59,7 @@ export default function GlobeOverlayLayer() {
           </div>
           <span style={{
             fontSize: 8, padding: '1px 5px', borderRadius: 3,
-            background: 'rgba(96,165,250,0.12)', color: '#60a5fa', fontWeight: 700,
+            background: 'rgba(239,68,68,0.12)', color: '#f87171', fontWeight: 700,
           }}>
             {Math.round((confidence ?? 0) * 100)}% conf.
           </span>

@@ -59,7 +59,7 @@ const CAT_PILL_COLOR = {
   Health:   { bg: 'rgba(239,68,68,0.12)',   color: '#f87171', border: 'rgba(239,68,68,0.25)'   },
   Politics: { bg: 'rgba(249,115,22,0.12)',  color: '#fb923c', border: 'rgba(249,115,22,0.25)'  },
   Finance:  { bg: 'rgba(234,179,8,0.12)',   color: '#facc15', border: 'rgba(234,179,8,0.25)'   },
-  Science:  { bg: 'rgba(59,130,246,0.12)',  color: '#60a5fa', border: 'rgba(59,130,246,0.25)'  },
+  Science:  { bg: 'rgba(239,68,68,0.12)',  color: '#f87171', border: 'rgba(239,68,68,0.25)'  },
   Conflict: { bg: 'rgba(239,68,68,0.12)',   color: '#f87171', border: 'rgba(239,68,68,0.25)'   },
   Climate:  { bg: 'rgba(16,185,129,0.12)',  color: '#34d399', border: 'rgba(16,185,129,0.25)'  },
 }
@@ -108,13 +108,13 @@ export default function RightSimulationPanel({
       {/* ── Panel header ── */}
       <div style={{
         padding: '9px 15px', ...divider,
-        fontSize: 10, fontWeight: 700, color: '#3b82f6',
+        fontSize: 10, fontWeight: 700, color: '#ef4444',
         letterSpacing: '0.1em', textTransform: 'uppercase',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <span>Intelligence Panel</span>
         {multiCats.size > 0 && (
-          <span style={{ fontSize: 9, color: '#3b82f6', background: 'rgba(59,130,246,0.12)', padding: '2px 6px', borderRadius: 3 }}>
+          <span style={{ fontSize: 9, color: '#ef4444', background: 'rgba(239,68,68,0.12)', padding: '2px 6px', borderRadius: 3 }}>
             {multiCats.size} filter{multiCats.size > 1 ? 's' : ''}
           </span>
         )}
@@ -227,7 +227,7 @@ export default function RightSimulationPanel({
           {/* Score cards */}
           <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
             {[
-              { label: 'Confidence', value: `${Math.round((selectedHotspot.confidence_score ?? 0) * 100)}%`, color: '#60a5fa' },
+              { label: 'Confidence', value: `${Math.round((selectedHotspot.confidence_score ?? 0) * 100)}%`, color: '#f87171' },
               { label: 'Virality', value: `${(selectedHotspot.virality_score ?? 0).toFixed(1)}×`, color: '#f59e0b' },
               {
                 label: 'Trend',
@@ -269,7 +269,7 @@ export default function RightSimulationPanel({
                     <span style={{ fontSize: 9, color: '#334155', fontFamily: 'monospace' }}>{p.pct}%</span>
                   </div>
                   <div style={{ height: 2, borderRadius: 1, background: 'rgba(255,255,255,0.05)' }}>
-                    <div style={{ height: '100%', borderRadius: 1, width: `${p.pct}%`, background: '#3b82f6', transition: 'width 0.5s' }} />
+                    <div style={{ height: '100%', borderRadius: 1, width: `${p.pct}%`, background: '#ef4444', transition: 'width 0.5s' }} />
                   </div>
                 </div>
               ))}
@@ -282,7 +282,7 @@ export default function RightSimulationPanel({
               <p style={{ ...sectionHeader, marginBottom: 5 }}>Top Claims</p>
               {selectedHotspot.topClaims.map((claim, i) => (
                 <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 5 }}>
-                  <span style={{ fontSize: 9, color: '#3b82f6', fontFamily: 'monospace', flexShrink: 0 }}>0{i + 1}</span>
+                  <span style={{ fontSize: 9, color: '#ef4444', fontFamily: 'monospace', flexShrink: 0 }}>0{i + 1}</span>
                   <p style={{ fontSize: 10, color: '#475569', lineHeight: 1.4 }}>{claim}</p>
                 </div>
               ))}
@@ -295,11 +295,11 @@ export default function RightSimulationPanel({
               {TIME_RANGES.map(r => (
                 <div key={r} style={{
                   flex: 1, textAlign: 'center', borderRadius: 4, padding: '4px 0',
-                  background: timeRange === r ? 'rgba(59,130,246,0.12)' : 'rgba(255,255,255,0.03)',
-                  border: `1px solid ${timeRange === r ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.05)'}`,
+                  background: timeRange === r ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${timeRange === r ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.05)'}`,
                 }}>
                   <p style={{ fontSize: 7, color: '#334155', textTransform: 'uppercase', marginBottom: 2 }}>{r}</p>
-                  <p style={{ fontSize: 11, fontWeight: 700, color: timeRange === r ? '#60a5fa' : '#475569', fontFamily: 'monospace' }}>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: timeRange === r ? '#f87171' : '#475569', fontFamily: 'monospace' }}>
                     {(selectedHotspot.timeData[r] ?? 0).toLocaleString()}
                   </p>
                 </div>
@@ -328,7 +328,7 @@ export default function RightSimulationPanel({
               <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
                 <button style={{
                   flex: 1, padding: '5px 0', borderRadius: 4, fontSize: 9, fontWeight: 700,
-                  cursor: 'pointer', background: '#3b82f6', color: 'white', border: 'none'
+                  cursor: 'pointer', background: '#ef4444', color: 'white', border: 'none'
                 }}>
                   Deploy via API
                 </button>
@@ -374,9 +374,9 @@ export default function RightSimulationPanel({
             <button key={c} onClick={() => toggleCat(c)} style={{
               padding: '4px 10px', borderRadius: 5, fontSize: 10, fontWeight: 600,
               cursor: 'pointer', transition: 'all 0.15s', outline: 'none',
-              background: catActive(c) ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.04)',
-              color: catActive(c) ? '#60a5fa' : '#475569',
-              border: `1px solid ${catActive(c) ? 'rgba(59,130,246,0.4)' : 'rgba(255,255,255,0.06)'}`,
+              background: catActive(c) ? 'rgba(239,68,68,0.18)' : 'rgba(255,255,255,0.04)',
+              color: catActive(c) ? '#f87171' : '#475569',
+              border: `1px solid ${catActive(c) ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.06)'}`,
             }}>
               {c}
             </button>

@@ -91,11 +91,11 @@ export default function LeftControlPanel({
       {/* ── Panel header ── */}
       <div style={{
         padding: '9px 15px', ...divider,
-        fontSize: 10, fontWeight: 700, color: '#3b82f6',
+        fontSize: 10, fontWeight: 700, color: '#ef4444',
         letterSpacing: '0.1em', textTransform: 'uppercase',
         display: 'flex', alignItems: 'center', gap: 7,
       }}>
-        <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#3b82f6', boxShadow: '0 0 5px #3b82f6' }} />
+        <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 5px #ef4444' }} />
         Target + Live Feed
       </div>
 
@@ -113,9 +113,9 @@ export default function LeftControlPanel({
             <button key={r} onClick={() => { setTimeRange(r); setIsPlaying(false) }} style={{
               flex: 1, padding: '5px 0', borderRadius: 5, fontSize: 10, fontWeight: 700,
               cursor: 'pointer',
-              border: `1px solid ${timeRange === r ? 'rgba(59,130,246,0.5)' : 'rgba(255,255,255,0.07)'}`,
-              background: timeRange === r ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.03)',
-              color:      timeRange === r ? '#60a5fa' : '#475569', transition: 'all 0.15s',
+              border: `1px solid ${timeRange === r ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.07)'}`,
+              background: timeRange === r ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.03)',
+              color:      timeRange === r ? '#f87171' : '#475569', transition: 'all 0.15s',
             }}>
               {r}
             </button>
@@ -145,12 +145,12 @@ export default function LeftControlPanel({
               style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                 cursor: 'pointer', padding: '3px 5px', borderRadius: 4, transition: 'background 0.1s',
-                background: selectedHotspot?.label === spot.label ? 'rgba(59,130,246,0.1)' : 'transparent',
+                background: selectedHotspot?.label === spot.label ? 'rgba(239,68,68,0.1)' : 'transparent',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
                 {(() => {
-                  const dotCol = spot.risk_level ? (RISK_COLOR[spot.risk_level] ?? SEV[spot.severity]?.ring) : SEV[spot.severity]?.ring ?? '#60a5fa'
+                  const dotCol = spot.risk_level ? (RISK_COLOR[spot.risk_level] ?? SEV[spot.severity]?.ring) : SEV[spot.severity]?.ring ?? '#f87171'
                   return (
                     <span style={{
                       width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
@@ -171,7 +171,7 @@ export default function LeftControlPanel({
               </div>
               <span style={{
                 fontSize: 10, fontWeight: 700, fontFamily: 'monospace', flexShrink: 0, marginLeft: 4,
-                color: spot.risk_level ? (RISK_COLOR[spot.risk_level] ?? SEV[spot.severity]?.ring) : SEV[spot.severity]?.ring ?? '#60a5fa',
+                color: spot.risk_level ? (RISK_COLOR[spot.risk_level] ?? SEV[spot.severity]?.ring) : SEV[spot.severity]?.ring ?? '#f87171',
               }}>
                 {spot.displayCount.toLocaleString()}
               </span>
@@ -190,7 +190,7 @@ export default function LeftControlPanel({
           {[...regions]
             .sort((a, b) => (a.reality_score ?? 50) - (b.reality_score ?? 50))
             .map(r => {
-              const barColor = r.risk_level ? (RISK_COLOR[r.risk_level] ?? SEV[r.severity]?.ring) : SEV[r.severity]?.ring ?? '#60a5fa'
+              const barColor = r.risk_level ? (RISK_COLOR[r.risk_level] ?? SEV[r.severity]?.ring) : SEV[r.severity]?.ring ?? '#f87171'
               const hasScore = r.reality_score != null
               return (
                 <div key={r.name}>
@@ -310,9 +310,9 @@ export default function LeftControlPanel({
         <button onClick={enableLocation} style={{
           width: '100%', padding: '7px 0', borderRadius: 6, fontSize: 10, fontWeight: 600,
           cursor: 'pointer',
-          border:      `1px solid ${userLocation ? 'rgba(16,185,129,0.35)' : 'rgba(59,130,246,0.25)'}`,
-          background:  userLocation ? 'rgba(16,185,129,0.1)' : 'rgba(59,130,246,0.07)',
-          color:       userLocation ? '#10b981' : '#60a5fa', transition: 'all 0.2s',
+          border:      `1px solid ${userLocation ? 'rgba(16,185,129,0.35)' : 'rgba(239,68,68,0.25)'}`,
+          background:  userLocation ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.07)',
+          color:       userLocation ? '#10b981' : '#f87171', transition: 'all 0.2s',
         }}>
           {userLocation ? '📍 Location Active — Refocus' : '📍 Focus My Location'}
         </button>

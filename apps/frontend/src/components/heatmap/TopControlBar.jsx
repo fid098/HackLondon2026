@@ -48,7 +48,7 @@ export default function TopControlBar({
       {/* ── Left: branding ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <span style={{ fontSize: 17, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>
-          <span style={{ color: '#818cf8' }}>ver</span>ify
+          <span style={{ color: '#ef4444' }}>ver</span>ify
         </span>
         <span style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.1)' }} />
         <span style={{ fontSize: 11, color: '#475569', fontWeight: 500 }}>Intelligence Heatmap</span>
@@ -66,10 +66,10 @@ export default function TopControlBar({
         <div style={{
           display: 'flex', alignItems: 'center', gap: 7,
           padding: '4px 13px', borderRadius: 6,
-          background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.25)',
-          fontSize: 11, fontWeight: 600, color: '#60a5fa',
+          background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)',
+          fontSize: 11, fontWeight: 600, color: '#f87171',
         }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3b82f6', animation: 'pulse 1.5s infinite' }} />
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ef4444', animation: 'pulse 1.5s infinite' }} />
           Live Monitoring
         </div>
 
@@ -96,8 +96,8 @@ export default function TopControlBar({
             <button key={m} onClick={() => setVizMode(m)} style={{
               padding: '3px 10px', borderRadius: 4, fontSize: 9, fontWeight: 700,
               cursor: 'pointer', border: 'none', textTransform: 'uppercase', letterSpacing: '0.06em',
-              background: vizMode === m ? 'rgba(59,130,246,0.25)' : 'transparent',
-              color:      vizMode === m ? '#60a5fa' : '#475569',
+              background: vizMode === m ? 'rgba(239,68,68,0.25)' : 'transparent',
+              color:      vizMode === m ? '#f87171' : '#475569',
               transition: 'all 0.15s',
             }}>
               {m === 'volume' ? 'Volume' : 'Risk'}

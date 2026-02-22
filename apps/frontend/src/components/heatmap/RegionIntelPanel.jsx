@@ -196,8 +196,8 @@ export default function RegionIntelPanel({ data, onClose }) {
               <span style={{
                 fontSize: 11, fontWeight: 700,
                 padding: '3px 9px', borderRadius: 4,
-                background: 'rgba(99,102,241,0.12)', color: '#818cf8',
-                border: '1px solid rgba(99,102,241,0.25)',
+                background: 'rgba(239,68,68,0.12)', color: '#ef4444',
+                border: '1px solid rgba(239,68,68,0.25)',
               }}>
                 {dominantCategory}
               </span>
