@@ -262,6 +262,7 @@ _NARRATIVES: list[NarrativeItem] = [
 
 # Structured feed items for the live WebSocket ticker.
 # Each entry includes city/category/severity so the frontend can render
+
 # color-coded intelligence cards without parsing the message string.
 _FEED_ITEMS = [
     {"city": "Jakarta", "category": "Health", "severity": "medium", "verb": "New event detected"},
@@ -437,12 +438,14 @@ async def heatmap_stream(websocket: WebSocket):
         while True:
             item = _FEED_ITEMS[idx % len(_FEED_ITEMS)]
             payload = {
+
                 "type": "event",
                 "message": f"{item['verb']} · {item['category']} · {item['city']}",
                 "city": item["city"],
                 "category": item["category"],
                 "severity": item["severity"],
                 "delta": random.randint(1, 8),
+
                 "timestamp": datetime.now(tz=timezone.utc).isoformat(),
             }
             await websocket.send_text(json.dumps(payload))
