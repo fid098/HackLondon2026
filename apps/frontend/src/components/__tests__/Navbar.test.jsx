@@ -19,9 +19,9 @@ function setup(currentPage = 'home', user = null) {
 }
 
 describe('Navbar', () => {
-  it('renders the TruthGuard brand name', () => {
+  it('renders the Veryfi brand name', () => {
     setup()
-    expect(screen.getByText('TruthGuard')).toBeInTheDocument()
+    expect(screen.getByText('Veryfi')).toBeInTheDocument()
   })
 
   it('renders 3 nav items: Analyze, Heatmap, Reports', () => {
@@ -40,7 +40,7 @@ describe('Navbar', () => {
 
   it('calls onNavigate("home") when the logo is clicked', () => {
     const { onNavigate } = setup('analyze')
-    fireEvent.click(screen.getByLabelText('TruthGuard home'))
+    fireEvent.click(screen.getByLabelText('Veryfi home'))
     expect(onNavigate).toHaveBeenCalledWith('home')
   })
 

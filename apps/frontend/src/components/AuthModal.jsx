@@ -79,16 +79,8 @@ export default function AuthModal({ mode: initialMode = 'login', onSuccess, onCl
         </button>
 
         {/* Logo */}
-        <div className="flex items-center gap-2.5 mb-7">
-          <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-            style={{ background: 'linear-gradient(135deg, #dc2626, #ef4444)' }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            </svg>
-          </div>
-          <span className="text-white font-bold text-lg">TruthGuard</span>
+        <div className="mb-7">
+          <span className="text-white font-bold text-2xl tracking-tight">Veryfi</span>
         </div>
 
         {/* Mode tabs */}

@@ -53,7 +53,7 @@ export default function Landing({ onNavigate }) {
   const shapeOpacity = useTransform(scrollYProgress, [0.7, 1], [1, 0])
 
   return (
-    <div ref={containerRef} className="relative text-white" style={{ background: 'var(--bg-base)' }}>
+    <div ref={containerRef} className="relative text-white">
 
       {/* ── Floating shapes layer ── */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
@@ -75,18 +75,18 @@ export default function Landing({ onNavigate }) {
       <div className="relative z-10">
 
         {/* ══════════════════ HERO ══════════════════ */}
-        <section className="pt-24 pb-16 md:pt-32 md:pb-20 flex flex-col justify-center px-6 md:px-16">
-          <div className="max-w-6xl mx-auto w-full">
+        <section className="min-h-[calc(100svh-88px)] flex items-center justify-center px-6 md:px-16">
+          <div className="max-w-6xl mx-auto w-full text-center">
             <h1 className="leading-none font-extrabold">
               <span className="block text-white text-4xl md:text-6xl lg:text-7xl">REALITY</span>
               <span className="block text-red-600  text-4xl md:text-6xl lg:text-7xl">CAN BE</span>
               <span className="block text-red-700  text-4xl md:text-6xl lg:text-7xl">FABRICATED.</span>
             </h1>
-            <p className="mt-8 max-w-2xl text-gray-400 text-base md:text-lg">
+            <p className="mt-8 max-w-2xl mx-auto text-gray-400 text-base md:text-lg">
               Deepfake officials. Forged planning notices. Synthetic infrastructure
               failures. In smart cities, misinformation becomes physical risk.
             </p>
-            <div className="mt-10 flex flex-col sm:flex-row gap-4">
+            <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
               <button
                 onClick={() => onNavigate('analyze')}
                 className="bg-gradient-to-r from-red-500 to-red-700 hover:scale-105 transition-transform px-8 py-3 rounded-md font-medium"
