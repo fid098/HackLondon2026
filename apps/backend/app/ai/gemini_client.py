@@ -21,6 +21,10 @@ from typing import Any
 
 from app.core.config import settings
 
+# Max base64 chars to send as inline vision data (~11 MB original file).
+# Files larger than this fall back to text-only analysis.
+_MAX_VISION_B64 = 15_000_000
+
 logger = logging.getLogger(__name__)
 
 
@@ -109,17 +113,31 @@ _MOCK_RESPONSES: dict[str, str] = {
         '["Claim 1: The stated fact is unverified", '
         '"Claim 2: Statistics cited appear manipulated"]'
     ),
+    # Probe mocks — returned by each parallel probe in deepfake_pipeline.py
+    "deepfake_probe": (
+        '{"suspicious": false, "score": 0.18, '
+        '"findings": ["No GAN grid artifacts detected in uniform regions", '
+        '"Natural pore-level skin variation present — inconsistent with diffusion smoothing"], '
+        '"summary": "No synthetic manipulation indicators detected in this analysis pass."}'
+    ),
+    # Synthesis mocks — final verdict from the synthesiser step
     "deepfake_image": (
-        '{"is_deepfake": false, "confidence": 0.50, '
-        '"reasoning": "[MOCK] No real detection performed — mock mode active."}'
+        '{"is_fake": false, "confidence": 0.15, '
+        '"reasoning": "[MOCK] Both probes returned clean results. '
+        'No significant GAN fingerprints, face-swap boundaries, or facial anatomy '
+        'inconsistencies were detected. The image appears to be genuine."}'
     ),
     "deepfake_audio": (
-        '{"is_synthetic": false, "confidence": 0.50, '
-        '"reasoning": "[MOCK] No real detection performed — mock mode active."}'
+        '{"is_fake": false, "confidence": 0.15, '
+        '"reasoning": "[MOCK] Both probes returned clean results. '
+        'Prosody patterns and spectral characteristics are consistent with natural '
+        'human speech. No TTS or voice-cloning fingerprints detected."}'
     ),
     "deepfake_video": (
-        '{"is_deepfake": false, "confidence": 0.50, '
-        '"reasoning": "[MOCK] No real detection performed — mock mode active."}'
+        '{"is_fake": false, "confidence": 0.15, '
+        '"reasoning": "[MOCK] All three probes returned clean results. '
+        'No inter-frame flickering, blending boundary shifts, or temporal '
+        'inconsistencies consistent with deepfake manipulation were detected."}'
     ),
     "quick_triage": (
         '{"verdict": "UNVERIFIED", "confidence": 30, '
@@ -205,6 +223,48 @@ class GeminiClient:
     async def generate_with_pro(self, prompt: str, response_key: str = "default") -> str:
         """Deep analysis with Gemini Pro (higher quality, higher cost)."""
         return await self.generate(prompt, model=GeminiModel.PRO, response_key=response_key)
+
+    async def generate_with_vision(
+        self,
+        prompt: str,
+        media_b64: str,
+        mime_type: str,
+        response_key: str = "default",
+    ) -> str:
+        """
+        Multimodal analysis — sends the actual image/audio/video bytes inline to Gemini.
+
+        Falls back to text-only generate() if the file exceeds _MAX_VISION_B64 chars
+        (too large for inline data; Gemini would reject it).
+
+        Args:
+            prompt:      The analysis prompt.
+            media_b64:   Base64-encoded media data (full, not truncated).
+            mime_type:   MIME type string e.g. "image/jpeg", "audio/mp3", "video/mp4".
+            response_key: Mock response key (ignored in real mode).
+        """
+        if self.mock_mode:
+            return _MOCK_RESPONSES.get(response_key, _MOCK_RESPONSES["default"])
+
+        if len(media_b64) > _MAX_VISION_B64:
+            logger.warning(
+                "Media too large for inline vision (%d chars > %d limit), "
+                "falling back to text-only analysis",
+                len(media_b64), _MAX_VISION_B64,
+            )
+            return await self.generate(prompt, response_key=response_key)
+
+        try:
+            gemini_model = self._genai.GenerativeModel(GeminiModel.PRO.value)
+            contents = [
+                {"text": prompt},
+                {"inline_data": {"mime_type": mime_type, "data": media_b64}},
+            ]
+            response = await gemini_model.generate_content_async(contents)
+            return response.text
+        except Exception as exc:
+            logger.error("Gemini Vision API error (mime=%s): %s", mime_type, exc)
+            raise
 
 
 # Module-level singleton — import and use this everywhere
