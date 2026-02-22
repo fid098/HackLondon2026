@@ -1,47 +1,43 @@
-# TruthGuard API — Python dependencies
-# Note: loose pins used where Python 3.14 wheels require newer versions.
-
-# ─── Web framework ────────────────────────────────────────────────
 fastapi==0.111.1
 uvicorn[standard]==0.30.3
 
-# ─── Database ─────────────────────────────────────────────────────
+
 motor==3.5.0           # Async MongoDB driver (wraps pymongo with asyncio)
 pymongo==4.8.0         # Sync driver (used by motor internally + for scripts)
 
-# ─── Validation / settings ────────────────────────────────────────
-pydantic[email]>=2.10.0    # 2.8.x has no Python 3.14 wheels
-pydantic-settings>=2.3.4
 
-# ─── Auth (Phase 1) ───────────────────────────────────────────────
+pydantic[email]==2.8.2
+pydantic-settings==2.3.4
+
+
 python-jose[cryptography]==3.3.0
-bcrypt>=4.0.0              # Direct bcrypt (security.py); passlib replaced to avoid Python 3.13 compat issues
+passlib[bcrypt]==1.7.4
 
-# ─── HTTP client (for adapters + tests) ───────────────────────────
-httpx>=0.28.1              # >=0.28.1 required by google-genai
 
-# ─── File uploads ─────────────────────────────────────────────────
+httpx==0.27.0
+
+
 python-multipart==0.0.9
 
-# ─── Utilities ────────────────────────────────────────────────────
+
 python-dotenv==1.0.1
-certifi>=2024.0.0         # Up-to-date CA bundle for MongoDB Atlas TLS on macOS
 
-# ─── Article / HTML extraction ────────────────────────────────────
-beautifulsoup4==4.12.3    # HTML parsing for article content extraction
-lxml>=5.3.0               # Fast BS4 parser backend (5.2.x has no Python 3.14 wheels)
-youtube-transcript-api==0.6.2  # YouTube transcript fetching (optional)
 
-# ─── Google AI (lazy-imported in real mode only) ──────────────────
-google-genai>=1.0.0       # New HTTP-based SDK; replaces google-generativeai
+google-generativeai==0.7.2
 
-# ─── Testing ──────────────────────────────────────────────────────
+
 pytest==8.3.2
 pytest-asyncio==0.23.8
-anyio[trio]>=4.8.0        # google-genai requires >=4.8.0
+anyio[trio]==4.4.0     # Async test backend
 
-# ─── Rate limiting ────────────────────────────────────────────────
+
 slowapi==0.1.9            # Starlette/FastAPI rate limiting (wraps limits library)
 
-# ─── Linting / formatting ─────────────────────────────────────────
+
+Pillow>=10.0.0          # Base64 → PIL Image decoding for CV model
+transformers>=4.35.0    # HuggingFace model loading
+torch>=2.0.0            # PyTorch CPU inference
+torchvision>=0.15.0     # Image transforms used by ViT pipeline
+
 ruff==0.5.5
+beautifulsoup4

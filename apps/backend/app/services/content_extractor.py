@@ -12,7 +12,7 @@ Strategy:
 All errors are caught and a best-effort string is returned so the pipeline
 never fails at the extraction stage.
 """
-
+from bs4 import BeautifulSoup  # noqa: PLC0415
 import base64
 import logging
 import re
@@ -76,7 +76,7 @@ def _is_tiktok_video(url: str) -> bool:
 
 def _bs_parse(html: str) -> "BeautifulSoup":  # type: ignore[name-defined]
     """Parse html with BS4, falling back to html.parser if lxml is absent."""
-    from bs4 import BeautifulSoup  # noqa: PLC0415
+    
 
     for parser in ("lxml", "html.parser"):
         try:
