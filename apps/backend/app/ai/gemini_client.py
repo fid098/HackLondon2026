@@ -18,15 +18,20 @@ reference them in generate() calls via the response_key parameter.
 import logging
 from enum import Enum
 from typing import Any
+import google.generativeai as genai
 
 from app.core.config import settings
+
+# Max base64 chars to send as inline vision data (~11 MB original file).
+# Files larger than this fall back to text-only analysis.
+_MAX_VISION_B64 = 15_000_000
 
 logger = logging.getLogger(__name__)
 
 
 class GeminiModel(str, Enum):
-    PRO = "gemini-1.5-pro"
-    FLASH = "gemini-1.5-flash"
+    PRO = "gemini-2.5-flash"
+    FLASH = "gemini-2.5-flash"
 
 
 # Canned responses for mock mode.
@@ -55,47 +60,131 @@ _MOCK_RESPONSES: dict[str, str] = {
     ),
     # agent_pro / agent_con are the keys used by debate_pipeline.py
     "agent_pro": (
-        "ARGUMENT: Based on available evidence, there is credible support for this claim. "
-        "Peer-reviewed literature and expert statements align with the core assertion.\n"
+        "ARGUMENT: Based on available evidence, there is strong credible support for this claim "
+        "from independent Tier 1 sources. According to [Reuters ★★★★★](https://www.reuters.com/) "
+        "the core facts have been independently verified and corroborated. "
+        "[BBC News ★★★★★](https://www.bbc.com/) has reported consistently with this position, "
+        "and the underlying data appears in cross-referenced PRIMARY sources with no significant "
+        "discrepancies found across two independent Tier 1 wire services.\n\n"
+        "KEY EVIDENCE: [Reuters ★★★★★](https://www.reuters.com/fact-check/) — PRIMARY source "
+        "directly confirming the core claim with corroborating data from official statements.\n\n"
         "POINTS:\n"
-        "- The underlying data point exists in peer-reviewed literature.\n"
-        "- Geographic scope of the claim is broadly correct.\n"
-        "- Credible institutions have cited similar statistics."
+        "- The core assertion is directly supported by a Tier 1 wire service — [Reuters ★★★★★](https://www.reuters.com/)\n"
+        "- Independent cross-reference confirms the claim — [BBC News ★★★★★](https://www.bbc.com/)\n"
+        "- Official institutional data aligns with this position — [GOV.UK ★★★★★](https://www.gov.uk/)\n\n"
+        "SOURCE QUALITY: HIGH"
     ),
     "agent_con": (
-        "ARGUMENT: Counter-evidence indicates this claim contains significant inaccuracies "
-        "or omits crucial context that fundamentally alters its meaning.\n"
+        "ARGUMENT: Counter-evidence suggests the claim, while not demonstrably false, lacks "
+        "important context that affects its full interpretation. "
+        "[AP Fact Check ★★★★★](https://apnews.com/hub/ap-fact-check) has noted similar claims "
+        "require additional nuance around scope and timeframe. "
+        "[Snopes ★★★★☆](https://www.snopes.com/) classifies related narratives as partially "
+        "accurate. The available counter-evidence is largely TYPE B — the core fact may be "
+        "accurate but the framing omits significant context. I acknowledge this is a relatively "
+        "weak counter-case as no TYPE A direct contradiction was found.\n\n"
         "POINTS:\n"
-        "- The study cited predates the claim by over a decade — the landscape has changed.\n"
-        "- The figure was cherry-picked; the same paper shows contrary trends in most cases.\n"
-        "- Multiple independent fact-checkers have flagged variants of this claim."
+        "- TYPE B — The claim lacks critical context about scope and timeline — [Snopes ★★★★☆](https://www.snopes.com/)\n"
+        "- TYPE C — Primary sourcing relies on secondary reports rather than direct documentation — [AP Fact Check ★★★★★](https://apnews.com/hub/ap-fact-check)\n"
+        "- TYPE B — Important qualifications in original data are not reflected in the claim — [PolitiFact ★★★★☆](https://www.politifact.com/)\n\n"
+        "SOURCE QUALITY: MEDIUM"
     ),
     "judge": (
-        '{"verdict": "MISLEADING", "confidence": 72, '
-        '"summary": "The claim contains partially accurate information but omits critical '
-        'context that significantly changes its meaning. The core statistic cited is real, '
-        'but the source and timeframe have been misrepresented.", '
+        '{"verdict": "TRUE", "confidence": 78, '
+        '"summary": "The claim is broadly accurate based on available Tier 1/2 evidence. '
+        'Agent A produced strong supporting evidence from credible primary sources. '
+        'Agent B\'s counter-case consisted of TYPE B and TYPE C evidence only, which per '
+        'evaluation rules cannot flip a well-sourced claim to MISLEADING.", '
         '"category": "General", '
-        '"reasoning": "After reviewing both arguments and available fact-check data, '
-        'the claim merits a MISLEADING verdict. While some supporting evidence exists, '
-        'the contradicting evidence and omitted context are substantial."}'
+        '"reasoning": "STEP 1 — Both agents cited independent sources from different domains. '
+        'STEP 2 — Agent A avg score 0.85 (HIGH) with two Tier 1 wire services. Agent B avg 0.71 (MEDIUM). '
+        'STEP 3 — Corroboration data supports the core claim. '
+        'STEP 4 — No TYPE A counter-evidence from Agent B; all points are TYPE B (missing context) '
+        'or TYPE C (source quality challenge) — insufficient to override well-sourced supporting evidence. '
+        'STEP 5 — No hallucination detected. STEP 6 — Fact-check data does not contradict Agent A.", '
+        '"decisive_factors": ['
+        '"Agent A provided Tier 1 primary source evidence directly confirming the core claim.", '
+        '"Agent B produced only TYPE B/C counter-evidence — cannot flip TRUE verdict under evaluation rules."'
+        '], '
+        '"source_quality_assessment": "Agent A: HIGH quality — two independent Tier 1 wire services cross-referenced. Agent B: MEDIUM quality — fact-checkers cited but no direct TYPE A contradiction found.", '
+        '"agent_scores": {"agent_a": 8.5, "agent_b": 4.2}}'
     ),
     "extract_claims": (
         "[MOCK] Extracted claims: "
         '["Claim 1: The stated fact is unverified", '
         '"Claim 2: Statistics cited appear manipulated"]'
     ),
+    # Probe mocks — returned by each parallel probe in deepfake_pipeline.py
+    "deepfake_probe": (
+        '{"suspicious": false, "score": 0.18, '
+        '"findings": ["No GAN grid artifacts detected in uniform regions", '
+        '"Natural pore-level skin variation present — inconsistent with diffusion smoothing"], '
+        '"summary": "No synthetic manipulation indicators detected in this analysis pass."}'
+    ),
+    # Synthesis mocks — final verdict from the synthesiser step
     "deepfake_image": (
-        '{"is_deepfake": false, "confidence": 0.50, '
-        '"reasoning": "[MOCK] No real detection performed — mock mode active."}'
+        '{"is_fake": false, "confidence": 0.15, '
+        '"reasoning": "[MOCK] Both probes returned clean results. '
+        'No significant GAN fingerprints, face-swap boundaries, or facial anatomy '
+        'inconsistencies were detected. The image appears to be genuine."}'
     ),
     "deepfake_audio": (
-        '{"is_synthetic": false, "confidence": 0.50, '
-        '"reasoning": "[MOCK] No real detection performed — mock mode active."}'
+        '{"is_fake": false, "confidence": 0.15, '
+        '"reasoning": "[MOCK] Both probes returned clean results. '
+        'Prosody patterns and spectral characteristics are consistent with natural '
+        'human speech. No TTS or voice-cloning fingerprints detected."}'
     ),
     "deepfake_video": (
-        '{"is_deepfake": false, "confidence": 0.50, '
-        '"reasoning": "[MOCK] No real detection performed — mock mode active."}'
+        '{"is_fake": false, "confidence": 0.15, '
+        '"reasoning": "[MOCK] All three probes returned clean results. '
+        'No inter-frame flickering, blending boundary shifts, or temporal '
+        'inconsistencies consistent with deepfake manipulation were detected."}'
+    ),
+    # YouTube AI-detection pipeline mocks
+    "youtube_defender": (
+        "ARGUMENT: Based on the transcript and metadata, there are clear indicators that this "
+        "content was produced by a human creator. The transcript contains specific factual "
+        "references, natural conversational phrasing with genuine hesitations, and cites "
+        "verifiable sources. The channel name and description are consistent with an "
+        "established human presence rather than a faceless AI content farm.\n\n"
+        "POINTS:\n"
+        "- Transcript contains specific cited sources and verifiable claims — inconsistent with generic AI output\n"
+        "- Natural speech patterns including corrections and topic tangents present in captions\n"
+        "- Channel has established identity with consistent thematic focus\n\n"
+        "SOURCE QUALITY: MEDIUM"
+    ),
+    "youtube_prosecutor": (
+        "ARGUMENT: Several indicators suggest this content may have been generated using AI "
+        "tools. The transcript shows consistent, unvaried sentence structures typical of "
+        "AI-generated scripts with no natural speech disfluencies. The title follows a "
+        "template format common in AI content farms, and the channel lacks verifiable "
+        "human identity markers. The thumbnail shows moderate AI manipulation signals.\n\n"
+        "POINTS:\n"
+        "- Transcript lacks personal anecdotes, hesitations, or topic-specific expertise markers\n"
+        "- Title follows AI content farm template: generic superlative + broad topic\n"
+        "- No citations or sources mentioned in transcript — common in AI-generated content\n\n"
+        "SOURCE QUALITY: LOW"
+    ),
+    "youtube_judge": (
+        '{"verdict": "UNCERTAIN", "confidence": 52, '
+        '"summary": "Mixed signals detected. The content shows some AI generation indicators '
+        '(consistent sentence structure, no citations) but also retains some markers of '
+        'human production (channel context, natural topic progression). Further context '
+        'is needed for a definitive verdict.", '
+        '"ai_indicators": ['
+        '"Transcript lacks natural speech disfluencies", '
+        '"Title follows generic AI content farm template", '
+        '"No citations or external sources referenced"'
+        '], '
+        '"human_indicators": ['
+        '"Channel shows consistent thematic focus", '
+        '"Content contains domain-specific terminology"'
+        '], '
+        '"reasoning": "Both agents presented credible but inconclusive cases. '
+        'Agent A identified channel consistency and domain terminology as human signals. '
+        'Agent B flagged script uniformity and absent citations as AI indicators. '
+        'Without stronger thumbnail AI signal or definitive TTS markers, UNCERTAIN is '
+        'the appropriate verdict."}'
     ),
     "quick_triage": (
         '{"verdict": "UNVERIFIED", "confidence": 30, '
@@ -131,7 +220,7 @@ class GeminiClient:
                 self.mock_mode = True
             else:
                 # Lazy import: only pull in the heavy SDK if we're in real mode
-                import google.generativeai as genai  # noqa: PLC0415
+                  # noqa: PLC0415
 
                 genai.configure(api_key=settings.gemini_api_key)
                 self._genai = genai
@@ -181,6 +270,48 @@ class GeminiClient:
     async def generate_with_pro(self, prompt: str, response_key: str = "default") -> str:
         """Deep analysis with Gemini Pro (higher quality, higher cost)."""
         return await self.generate(prompt, model=GeminiModel.PRO, response_key=response_key)
+
+    async def generate_with_vision(
+        self,
+        prompt: str,
+        media_b64: str,
+        mime_type: str,
+        response_key: str = "default",
+    ) -> str:
+        """
+        Multimodal analysis — sends the actual image/audio/video bytes inline to Gemini.
+
+        Falls back to text-only generate() if the file exceeds _MAX_VISION_B64 chars
+        (too large for inline data; Gemini would reject it).
+
+        Args:
+            prompt:      The analysis prompt.
+            media_b64:   Base64-encoded media data (full, not truncated).
+            mime_type:   MIME type string e.g. "image/jpeg", "audio/mp3", "video/mp4".
+            response_key: Mock response key (ignored in real mode).
+        """
+        if self.mock_mode:
+            return _MOCK_RESPONSES.get(response_key, _MOCK_RESPONSES["default"])
+
+        if len(media_b64) > _MAX_VISION_B64:
+            logger.warning(
+                "Media too large for inline vision (%d chars > %d limit), "
+                "falling back to text-only analysis",
+                len(media_b64), _MAX_VISION_B64,
+            )
+            return await self.generate(prompt, response_key=response_key)
+
+        try:
+            gemini_model = self._genai.GenerativeModel(GeminiModel.PRO.value)
+            contents = [
+                {"text": prompt},
+                {"inline_data": {"mime_type": mime_type, "data": media_b64}},
+            ]
+            response = await gemini_model.generate_content_async(contents)
+            return response.text
+        except Exception as exc:
+            logger.error("Gemini Vision API error (mime=%s): %s", mime_type, exc)
+            raise
 
 
 # Module-level singleton — import and use this everywhere

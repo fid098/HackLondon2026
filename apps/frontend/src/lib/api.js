@@ -176,6 +176,40 @@ export function openHeatmapStream(onMessage) {
   return ws
 }
 
+/**
+ * Fetch narrative spread arc pairs (same narrative_id appearing in ≥2 locations).
+ * @param {{ hours?: number, category?: string }} opts
+ * @returns {Promise<Array<{ startLat, startLng, endLat, endLng, category, strength }>>}
+ *
+ * API INTEGRATION — MongoDB aggregation (apps/backend/app/routes/heatmap.py):
+ *   db.reports.aggregate([
+ *     { $match: { timestamp: { $gte: cutoff }, narrative_id: { $exists: true } } },
+ *     { $group: { _id: "$narrative_id",
+ *         locations: { $addToSet: { lat: "$geo.lat", lng: "$geo.lng", city: "$geo.city" } },
+ *         category: { $first: "$category" }, strength: { $sum: 1 } } },
+ *     { $match: { "locations.1": { $exists: true } } },
+ *     { $sort: { strength: -1 } }, { $limit: 40 }
+ *   ])
+ */
+export async function getHeatmapArcs({ hours = 24, category } = {}) {
+  const qs = new URLSearchParams({ hours })
+  if (category && category !== 'All') qs.set('category', category)
+  return get(`/api/v1/heatmap/arcs?${qs}`)
+}
+
+/**
+ * Run a predictive spread simulation for a given hotspot / category.
+ * @param {{ hotspot_label?: string, category?: string, time_horizon_hours?: number }} payload
+ * @returns {Promise<{ projected_spread: Array<{lat,lng,projectedCount}>, confidence: number, model: string }>}
+ *
+ * API INTEGRATION — backend should use historical velocity + virality to project
+ * spread into adjacent regions over time_horizon_hours.
+ * Endpoint: POST /api/v1/heatmap/simulate
+ */
+export async function runSimulation(payload) {
+  return post('/api/v1/heatmap/simulate', payload)
+}
+
 /* ─── deepfake detection ──────────────────────────────────────────────────────── */
 
 /**
@@ -203,6 +237,17 @@ export async function analyzeDeepfakeAudio(payload) {
  */
 export async function analyzeDeepfakeVideo(payload) {
   return post('/api/v1/deepfake/video', payload)
+}
+
+/* ─── YouTube AI-content detection ───────────────────────────────────────────── */
+
+/**
+ * Analyse a YouTube video URL for AI-generated content.
+ * @param {{ url: string }} payload
+ * @returns {Promise<YouTubeAnalysisResponse>}
+ */
+export async function analyzeYouTube(payload) {
+  return post('/api/v1/youtube/analyze', payload)
 }
 
 /* ─── scam detection ──────────────────────────────────────────────────────────── */

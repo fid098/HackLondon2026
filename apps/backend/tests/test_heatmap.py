@@ -115,3 +115,35 @@ class TestHeatmapRegions:
         valid = {"high", "medium", "low"}
         for r in regions:
             assert r["severity"] in valid
+
+
+class TestHeatmapFlags:
+    async def test_submit_flag_returns_201(self, hm_client):
+        payload = {
+            "source_url": "https://www.youtube.com/watch?v=test",
+            "platform": "youtube",
+            "category": "Deepfake",
+            "reason": "user_suspected_ai_video",
+            "confidence": 88,
+            "location": {"lat": 51.5074, "lng": -0.1278},
+        }
+        r = await hm_client.post("/api/v1/heatmap/flags", json=payload)
+        assert r.status_code == 201
+
+        data = r.json()
+        assert data["ok"] is True
+        assert data["event"]["category"] == "Deepfake"
+        assert data["event"]["severity"] == "high"
+        assert data["event"]["label"] == "YouTube"
+
+    async def test_submitted_flag_appears_in_heatmap_snapshot(self, hm_client):
+        payload = {
+            "source_url": "https://www.tiktok.com/@test/video/123",
+            "platform": "tiktok",
+            "category": "Deepfake",
+            "reason": "user_suspected_ai_video",
+        }
+        await hm_client.post("/api/v1/heatmap/flags", json=payload)
+        snapshot = (await hm_client.get("/api/v1/heatmap")).json()
+
+        assert any(e["category"] == "Deepfake" for e in snapshot["events"])

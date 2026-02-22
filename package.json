@@ -1,5 +1,6 @@
 {
   "dependencies": {
-    "framer-motion": "^12.34.3"
+    "react-globe.gl": "^2.37.0",
+    "three": "^0.183.1"
   }
 }

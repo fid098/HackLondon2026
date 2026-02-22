@@ -30,6 +30,7 @@ from app.routes.reports import router as reports_router
 from app.routes.scam import router as scam_router
 from app.routes.triage import router as triage_router
 from app.routes.users import router as users_router
+from app.routes.youtube import router as youtube_router
 
 # ─── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -111,6 +112,9 @@ app.include_router(deepfake_router)
 
 # Phase 6 — Scam Detection + Feedback
 app.include_router(scam_router)
+
+# Phase 7 — YouTube AI-Content Detection
+app.include_router(youtube_router)
 
 
 @app.get("/", tags=["root"])

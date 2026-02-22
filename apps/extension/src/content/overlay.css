@@ -37,6 +37,32 @@
 .tg-verdict-unverified { background: rgba(99,102,241,0.15);  color: #6366f1; border: 1px solid rgba(99,102,241,0.35);  }
 .tg-verdict-true       { background: rgba(16,185,129,0.15);  color: #10b981; border: 1px solid rgba(16,185,129,0.35);  }
 
+/* Video deepfake warning badge (non-disruptive overlay). */
+.tg-video-container {
+  position: relative;
+}
+
+.tg-video-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 9999;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+
+.tg-video-badge-risk {
+  color: #fff1f2;
+  background: rgba(185, 28, 28, 0.88);
+  border: 1px solid rgba(239, 68, 68, 0.85);
+  box-shadow: 0 6px 16px rgba(127, 29, 29, 0.5);
+}
+
 /* ── Selection "Analyze" tooltip ─────────────────────────────────────────────── */
 
 .tg-tooltip {
@@ -130,6 +156,75 @@
   color: #94a3b8;
   line-height: 1.5;
   margin: 0;
+}
+
+/* ── Inline text highlights (DOM phrase-level annotations) ───────────────── */
+
+mark.tg-hl {
+  border-radius: 2px;
+  padding: 0 2px;
+  font: inherit;
+  cursor: default;
+}
+
+mark.tg-hl-ai-generated {
+  background: rgba(239, 68, 68, 0.22);
+  color: inherit;
+  outline: 1px solid rgba(239, 68, 68, 0.45);
+}
+
+mark.tg-hl-accurate {
+  background: rgba(16, 185, 129, 0.20);
+  color: inherit;
+  outline: 1px solid rgba(16, 185, 129, 0.40);
+}
+
+mark.tg-hl-misleading {
+  background: rgba(245, 158, 11, 0.20);
+  color: inherit;
+  outline: 1px solid rgba(245, 158, 11, 0.40);
+}
+
+/* ── Highlight chips row in result banner ─────────────────────────────────── */
+
+.tg-highlights-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.tg-hl-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-weight: 600;
+  white-space: nowrap;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tg-hl-chip.tg-hl-ai-generated {
+  background: rgba(239, 68, 68, 0.18);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.tg-hl-chip.tg-hl-accurate {
+  background: rgba(16, 185, 129, 0.18);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.tg-hl-chip.tg-hl-misleading {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
 }
 
 /* ── Animations ──────────────────────────────────────────────────────────────── */

@@ -2,12 +2,25 @@
 deepfake.py — Pydantic models for Phase 5 Deepfake Detection API.
 
 Three detection modalities:
-  - Image: CNN + Gemini Pro VLM — detects face-swaps, GAN artifacts, composite images
-  - Audio: SVM MFCC + Gemini Pro — detects voice cloning, synthetic speech
-  - Video: Frame-sample image pipeline + temporal consistency — detects video deepfakes
+  - Image: 2-probe Gemini Vision pipeline — GAN/artifact scan + facial consistency
+  - Audio: 2-probe Gemini Vision pipeline — prosody analysis + spectral fingerprint
+  - Video: 3-probe Gemini Vision pipeline — visual artifacts + facial + temporal consistency
+
+Each response now includes an `stages` list so the frontend can show per-probe
+detail alongside the final verdict.
 """
 
 from pydantic import BaseModel, Field
+
+
+# ── Shared sub-models ───────────────────────────────────────────────────────────
+
+class AnalysisStage(BaseModel):
+    """One step in the deepfake detection pipeline (probe or synthesiser)."""
+
+    name: str    # e.g. "GAN & Artifact Scan", "Temporal Consistency Analysis"
+    finding: str # one-sentence summary from this step
+    score: float # 0.0 = clean/genuine, 1.0 = definitely manipulated
 
 
 # ── Request models ─────────────────────────────────────────────────────────────
@@ -38,22 +51,25 @@ class DeepfakeVideoRequest(BaseModel):
 class DeepfakeImageResponse(BaseModel):
     """Result of image deepfake analysis."""
 
-    is_deepfake: bool   # True = manipulated / AI-generated
-    confidence:  float  # 0.0 – 1.0
-    reasoning:   str    # brief explanation of the verdict
+    is_deepfake: bool               # True = manipulated / AI-generated
+    confidence:  float              # 0.0 – 1.0
+    reasoning:   str                # brief explanation of the verdict
+    stages: list[AnalysisStage] = Field(default_factory=list)  # per-probe detail
 
 
 class DeepfakeAudioResponse(BaseModel):
     """Result of audio synthetic-speech detection."""
 
-    is_synthetic: bool  # True = voice-cloned / TTS-generated
-    confidence:   float # 0.0 – 1.0
+    is_synthetic: bool              # True = voice-cloned / TTS-generated
+    confidence:   float             # 0.0 – 1.0
     reasoning:    str
+    stages: list[AnalysisStage] = Field(default_factory=list)
 
 
 class DeepfakeVideoResponse(BaseModel):
     """Result of video deepfake analysis."""
 
-    is_deepfake: bool   # True = deepfake / face-swapped
-    confidence:  float  # 0.0 – 1.0
+    is_deepfake: bool               # True = deepfake / face-swapped
+    confidence:  float              # 0.0 – 1.0
     reasoning:   str
+    stages: list[AnalysisStage] = Field(default_factory=list)
