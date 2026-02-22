@@ -12,8 +12,10 @@ All errors are caught and a best-effort string is returned so the pipeline
 never fails at the extraction stage.
 """
 
+import base64
 import logging
 import re
+from dataclasses import dataclass, field
 
 import httpx
 
@@ -22,6 +24,20 @@ logger = logging.getLogger(__name__)
 _YT_RE = re.compile(
     r"(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/shorts/)([A-Za-z0-9_-]{11})"
 )
+
+
+@dataclass
+class YouTubeData:
+    """Rich YouTube video metadata returned by extract_youtube_full()."""
+    video_id:      str
+    url:           str
+    title:         str = ""
+    channel:       str = ""
+    description:   str = ""
+    transcript:    str = ""
+    has_transcript: bool = False
+    thumbnail_b64: str = ""           # base64 JPEG thumbnail (empty if download failed)
+    thumbnail_url: str = ""
 
 _SCRIPT_RE = re.compile(r"<script[^>]*>.*?</script>", re.DOTALL | re.IGNORECASE)
 _STYLE_RE  = re.compile(r"<style[^>]*>.*?</style>",  re.DOTALL | re.IGNORECASE)
@@ -108,6 +124,77 @@ async def extract_from_youtube(url: str) -> str:
     except Exception as exc:
         logger.warning("YouTube scrape fallback failed for %s: %s", url, exc)
         return f"[Could not extract YouTube content from {url}]"
+
+
+async def extract_youtube_full(url: str) -> YouTubeData:
+    """
+    Fetch rich metadata for a YouTube video: transcript, title, channel,
+    description, and thumbnail (base64-encoded JPEG).
+
+    Never raises — all failures are logged and safe defaults returned.
+    """
+    m = _YT_RE.search(url)
+    if not m:
+        return YouTubeData(video_id="", url=url)
+
+    video_id = m.group(1)
+    data = YouTubeData(video_id=video_id, url=url)
+
+    # ── Transcript ──────────────────────────────────────────────────────────
+    try:
+        from youtube_transcript_api import YouTubeTranscriptApi  # type: ignore
+        segments = YouTubeTranscriptApi.get_transcript(video_id)
+        data.transcript = " ".join(s["text"] for s in segments)[:_MAX_LEN]
+        data.has_transcript = True
+    except ImportError:
+        logger.debug("youtube-transcript-api not installed")
+    except Exception as exc:
+        logger.warning("Transcript fetch failed for %s: %s", video_id, exc)
+
+    # ── Page metadata (title, channel, description) ─────────────────────────
+    try:
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+            html = resp.text
+
+        title_m = re.search(r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
+        if title_m:
+            data.title = _strip_html(title_m.group(1)).replace(" - YouTube", "").strip()
+
+        # Channel name from itemprop or meta author
+        ch_m = re.search(r'"author"\s*:\s*"([^"]{1,120})"', html)
+        if ch_m:
+            data.channel = ch_m.group(1)
+
+        desc_m = re.search(
+            r'<meta[^>]+name=["\']description["\'][^>]+content=["\'](.*?)["\']',
+            html, re.IGNORECASE,
+        )
+        if desc_m:
+            data.description = _strip_html(desc_m.group(1))[:500]
+
+    except Exception as exc:
+        logger.warning("YouTube page scrape failed for %s: %s", video_id, exc)
+
+    # ── Thumbnail (maxresdefault → hqdefault fallback) ──────────────────────
+    for res in ("maxresdefault", "hqdefault"):
+        thumb_url = f"https://img.youtube.com/vi/{video_id}/{res}.jpg"
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                tr = await client.get(thumb_url)
+                if tr.status_code == 200 and len(tr.content) > 5_000:
+                    data.thumbnail_b64 = base64.b64encode(tr.content).decode()
+                    data.thumbnail_url = thumb_url
+                    break
+        except Exception as exc:
+            logger.debug("Thumbnail fetch %s failed: %s", thumb_url, exc)
+
+    # Fallback transcript from title+description if no captions
+    if not data.transcript and data.title:
+        data.transcript = f"{data.title}\n\n{data.description}"
+
+    return data
 
 
 async def extract_content(source_type: str, url: str | None, text: str | None) -> str:

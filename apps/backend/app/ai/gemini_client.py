@@ -139,6 +139,52 @@ _MOCK_RESPONSES: dict[str, str] = {
         'No inter-frame flickering, blending boundary shifts, or temporal '
         'inconsistencies consistent with deepfake manipulation were detected."}'
     ),
+    # YouTube AI-detection pipeline mocks
+    "youtube_defender": (
+        "ARGUMENT: Based on the transcript and metadata, there are clear indicators that this "
+        "content was produced by a human creator. The transcript contains specific factual "
+        "references, natural conversational phrasing with genuine hesitations, and cites "
+        "verifiable sources. The channel name and description are consistent with an "
+        "established human presence rather than a faceless AI content farm.\n\n"
+        "POINTS:\n"
+        "- Transcript contains specific cited sources and verifiable claims — inconsistent with generic AI output\n"
+        "- Natural speech patterns including corrections and topic tangents present in captions\n"
+        "- Channel has established identity with consistent thematic focus\n\n"
+        "SOURCE QUALITY: MEDIUM"
+    ),
+    "youtube_prosecutor": (
+        "ARGUMENT: Several indicators suggest this content may have been generated using AI "
+        "tools. The transcript shows consistent, unvaried sentence structures typical of "
+        "AI-generated scripts with no natural speech disfluencies. The title follows a "
+        "template format common in AI content farms, and the channel lacks verifiable "
+        "human identity markers. The thumbnail shows moderate AI manipulation signals.\n\n"
+        "POINTS:\n"
+        "- Transcript lacks personal anecdotes, hesitations, or topic-specific expertise markers\n"
+        "- Title follows AI content farm template: generic superlative + broad topic\n"
+        "- No citations or sources mentioned in transcript — common in AI-generated content\n\n"
+        "SOURCE QUALITY: LOW"
+    ),
+    "youtube_judge": (
+        '{"verdict": "UNCERTAIN", "confidence": 52, '
+        '"summary": "Mixed signals detected. The content shows some AI generation indicators '
+        '(consistent sentence structure, no citations) but also retains some markers of '
+        'human production (channel context, natural topic progression). Further context '
+        'is needed for a definitive verdict.", '
+        '"ai_indicators": ['
+        '"Transcript lacks natural speech disfluencies", '
+        '"Title follows generic AI content farm template", '
+        '"No citations or external sources referenced"'
+        '], '
+        '"human_indicators": ['
+        '"Channel shows consistent thematic focus", '
+        '"Content contains domain-specific terminology"'
+        '], '
+        '"reasoning": "Both agents presented credible but inconclusive cases. '
+        'Agent A identified channel consistency and domain terminology as human signals. '
+        'Agent B flagged script uniformity and absent citations as AI indicators. '
+        'Without stronger thumbnail AI signal or definitive TTS markers, UNCERTAIN is '
+        'the appropriate verdict."}'
+    ),
     "quick_triage": (
         '{"verdict": "UNVERIFIED", "confidence": 30, '
         '"summary": "[MOCK] Quick triage complete — no real analysis in mock mode."}'

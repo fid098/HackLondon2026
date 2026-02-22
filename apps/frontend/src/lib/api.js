@@ -205,6 +205,17 @@ export async function analyzeDeepfakeVideo(payload) {
   return post('/api/v1/deepfake/video', payload)
 }
 
+/* ─── YouTube AI-content detection ───────────────────────────────────────────── */
+
+/**
+ * Analyse a YouTube video URL for AI-generated content.
+ * @param {{ url: string }} payload
+ * @returns {Promise<YouTubeAnalysisResponse>}
+ */
+export async function analyzeYouTube(payload) {
+  return post('/api/v1/youtube/analyze', payload)
+}
+
 /* ─── scam detection ──────────────────────────────────────────────────────────── */
 
 /**
