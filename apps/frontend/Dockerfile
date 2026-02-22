@@ -13,8 +13,8 @@ FROM node:20-alpine AS development
 
 WORKDIR /app
 
-# Copy package files first for layer caching
-COPY package*.json ./
+# Copy package files + .npmrc first for layer caching
+COPY package*.json .npmrc* ./
 RUN npm ci
 
 # Source is volume-mounted in docker-compose for hot-reload
@@ -29,7 +29,7 @@ CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 FROM node:20-alpine AS builder
 
 WORKDIR /app
-COPY package*.json ./
+COPY package*.json .npmrc* ./
 RUN npm ci
 COPY . .
 
