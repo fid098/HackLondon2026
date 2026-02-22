@@ -199,7 +199,7 @@ function ScoreBar({ label, value, color }) {
 
 /* ─── result cards ────────────────────────────────────────────────────────────── */
 
-function FactCard({ result, onSave }) {
+function FactCard({ result, onSave, saveStatus, saveError }) {
   const vs = VERDICT_STYLES[result.verdict] ?? VERDICT_STYLES.UNVERIFIED
   return (
     <div className="rounded-2xl p-6 flex flex-col gap-5"
@@ -218,22 +218,24 @@ function FactCard({ result, onSave }) {
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="rounded-xl p-4" style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.12)' }}>
+        <div className="rounded-xl p-4 min-w-0 overflow-hidden" style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.12)' }}>
           <p className="text-emerald-400 text-xs font-semibold mb-2">✓ Supporting</p>
           <ul className="space-y-1.5">
             {result.pro_points?.map((pt, i) => (
-              <li key={i} className="text-slate-400 text-xs flex gap-2">
-                <span className="text-emerald-700 shrink-0">•</span>{pt}
+              <li key={i} className="text-slate-400 text-xs flex gap-2 min-w-0">
+                <span className="text-emerald-700 shrink-0">•</span>
+                <span className="break-words min-w-0">{pt}</span>
               </li>
             ))}
           </ul>
         </div>
-        <div className="rounded-xl p-4" style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.12)' }}>
+        <div className="rounded-xl p-4 min-w-0 overflow-hidden" style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.12)' }}>
           <p className="text-red-400 text-xs font-semibold mb-2">✕ Contradicting</p>
           <ul className="space-y-1.5">
             {result.con_points?.map((pt, i) => (
-              <li key={i} className="text-slate-400 text-xs flex gap-2">
-                <span className="text-red-700 shrink-0">•</span>{pt}
+              <li key={i} className="text-slate-400 text-xs flex gap-2 min-w-0">
+                <span className="text-red-700 shrink-0">•</span>
+                <span className="break-words min-w-0">{pt}</span>
               </li>
             ))}
           </ul>
@@ -245,18 +247,29 @@ function FactCard({ result, onSave }) {
           <p className="text-xs text-slate-600 uppercase tracking-widest mb-2">Sources</p>
           {result.sources.map((s, i) => (
             <a key={i} href={s.url} target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-2 text-xs text-slate-500 hover:text-emerald-400 transition-colors mb-1">
-              <span className="text-slate-700 font-mono shrink-0">[{i + 1}]</span>{s.title}
-              <span className="text-slate-700">↗</span>
+              className="flex items-center gap-2 text-xs text-slate-500 hover:text-emerald-400 transition-colors mb-1 min-w-0">
+              <span className="text-slate-700 font-mono shrink-0">[{i + 1}]</span>
+              <span className="break-words min-w-0 flex-1">{s.title}</span>
+              <span className="text-slate-700 shrink-0">↗</span>
             </a>
           ))}
         </div>
       )}
 
-      <button onClick={onSave}
-        className="btn-secondary text-xs px-4 py-2 flex items-center gap-1.5 self-start">
-        💾 Save to Reports
-      </button>
+      <div className="flex flex-col gap-1.5">
+        <button
+          onClick={onSave}
+          disabled={saveStatus === 'saving' || saveStatus === 'saved'}
+          className="btn-secondary text-xs px-4 py-2 flex items-center gap-1.5 self-start disabled:opacity-60 disabled:cursor-not-allowed">
+          {saveStatus === 'saving' && <><span className="animate-spin">⏳</span> Saving…</>}
+          {saveStatus === 'saved'  && <>✓ Saved</>}
+          {saveStatus === 'error'  && <>✕ Retry Save</>}
+          {saveStatus === 'idle'   && <>💾 Save to Reports</>}
+        </button>
+        {saveStatus === 'error' && saveError && (
+          <p className="text-xs text-red-400">{saveError}</p>
+        )}
+      </div>
     </div>
   )
 }
@@ -565,25 +578,25 @@ function YouTubeCard({ result }) {
 
       {/* ── Indicators ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 px-6 pb-4">
-        <div className="rounded-xl p-4" style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.12)' }}>
+        <div className="rounded-xl p-4 min-w-0 overflow-hidden" style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.12)' }}>
           <p className="text-red-400 text-xs font-semibold mb-2">🤖 AI Indicators</p>
           {result.ai_indicators.length > 0 ? (
             <ul className="space-y-1">
               {result.ai_indicators.map((ind, i) => (
-                <li key={i} className="text-slate-400 text-xs flex gap-2">
-                  <span className="text-red-700 shrink-0">•</span>{ind}
+                <li key={i} className="text-slate-400 text-xs flex gap-2 min-w-0">
+                  <span className="text-red-700 shrink-0">•</span><span className="break-words min-w-0">{ind}</span>
                 </li>
               ))}
             </ul>
           ) : <p className="text-slate-600 text-xs">None detected.</p>}
         </div>
-        <div className="rounded-xl p-4" style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.12)' }}>
+        <div className="rounded-xl p-4 min-w-0 overflow-hidden" style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.12)' }}>
           <p className="text-emerald-400 text-xs font-semibold mb-2">👤 Human Indicators</p>
           {result.human_indicators.length > 0 ? (
             <ul className="space-y-1">
               {result.human_indicators.map((ind, i) => (
-                <li key={i} className="text-slate-400 text-xs flex gap-2">
-                  <span className="text-emerald-700 shrink-0">•</span>{ind}
+                <li key={i} className="text-slate-400 text-xs flex gap-2 min-w-0">
+                  <span className="text-emerald-700 shrink-0">•</span><span className="break-words min-w-0">{ind}</span>
                 </li>
               ))}
             </ul>
@@ -680,6 +693,8 @@ export default function Analyze() {
   const [youtubeResult,  setYoutubeResult]  = useState(null)
   const [mediaKind,      setMediaKind]      = useState(null)
   const [feedback,       setFeedback]       = useState(null)
+  const [saveStatus,     setSaveStatus]     = useState('idle')  // 'idle'|'saving'|'saved'|'error'
+  const [saveError,      setSaveError]      = useState(null)
   const [pipelineStep,   setPipelineStep]   = useState(-1)
   const fileRef = useRef(null)
 
@@ -700,6 +715,7 @@ export default function Analyze() {
   const clearResults = () => {
     setFactResult(null); setScamResult(null); setDeepfakeResult(null)
     setYoutubeResult(null); setMediaKind(null); setFeedback(null); setError(null)
+    setSaveStatus('idle'); setSaveError(null)
   }
 
   /* ── file selection ── */
@@ -796,7 +812,9 @@ export default function Analyze() {
 
   /* ── save report ── */
   const handleSave = async () => {
-    if (!factResult) return
+    if (!factResult || saveStatus === 'saving' || saveStatus === 'saved') return
+    setSaveStatus('saving')
+    setSaveError(null)
     try {
       await saveReport({
         source_type: factResult.source_type ?? tab,
@@ -808,8 +826,14 @@ export default function Analyze() {
         con_points:  factResult.con_points ?? [],
         sources:     factResult.sources ?? [],
         category:    factResult.category ?? 'General',
+        debate:      factResult.debate ?? null,
       })
-    } catch (_) { /* silently ignore */ }
+      setSaveStatus('saved')
+    } catch (err) {
+      setSaveStatus('error')
+      setSaveError(err?.message ?? 'Save failed — is the backend running?')
+      setTimeout(() => setSaveStatus('idle'), 5000)
+    }
   }
 
   /* ── scam feedback ── */
@@ -996,7 +1020,7 @@ export default function Analyze() {
           {/* Text/URL: two-column grid */}
           {factResult && scamResult && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              <FactCard result={factResult} onSave={handleSave} />
+              <FactCard result={factResult} onSave={handleSave} saveStatus={saveStatus} saveError={saveError} />
               <ScamCard result={scamResult} feedback={feedback} onFeedback={handleFeedback} />
             </div>
           )}

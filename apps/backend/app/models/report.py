@@ -102,3 +102,4 @@ class SaveReportRequest(BaseModel):
     con_points: list[str] = Field(default_factory=list)
     sources: list[SourceCitation] = Field(default_factory=list)
     category: str = "General"
+    debate: Optional[DebateArtifact] = None
