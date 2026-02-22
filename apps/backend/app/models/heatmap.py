@@ -1,19 +1,86 @@
 """
-heatmap.py — Pydantic models for Phase 3 Heatmap API.
+heatmap.py — Pydantic models for Heatmap API + Reality Stability Intelligence Layer.
+
+Phase 1 additions
+─────────────────
+HeatmapEvent now carries both:
+  • Legacy SVG coords (cx, cy) — kept for backward-compat with seed data
+  • Geographic coords  (lat, lng) — used by the 3-D globe and future geo-queries
+
+Intelligence scoring fields (all Optional — backend may omit them; the
+frontend's intelligenceProvider.js always fills them in via realityScoring.js):
+  • reality_score      0–100  (lower = more destabilised)
+  • risk_level         LOW | MEDIUM | HIGH | CRITICAL
+  • virality_score     normalised 0–10
+  • dominant_narrative top narrative title for this hotspot / region
+  • next_action        recommended response string
+  • confidence_score   0–1 model confidence that events ARE misinformation
+
+RegionStats also gains the three key intelligence fields so the region cards
+in the UI can display them without a second API call.
+
+MongoDB migration note
+──────────────────────
+When real aggregation replaces the seed data, each document in the
+`heatmap_events` collection should have this shape:
+
+  {
+    "location": { "type": "Point", "coordinates": [lng, lat] },  ← 2dsphere
+    "label": "New York",
+    "count": 312,
+    "severity": "high",
+    "category": "Health",
+    "confidence_score": 0.87,
+    "virality_score": 1.4,
+    "is_coordinated": false,
+    "is_spike_anomaly": false,
+    "trend": "up",
+    "timestamp": ISODate("2026-02-22T00:00:00Z")
+  }
+
+The lat/lng fields in HeatmapEvent can then be populated directly from
+`coordinates[1]` and `coordinates[0]` in the aggregation $project stage.
 """
+
+from typing import Optional
 
 from pydantic import BaseModel
 
 
 class HeatmapEvent(BaseModel):
-    """A single geo-positioned misinformation hotspot (SVG map coordinates, 0–100)."""
+    """A single geo-positioned misinformation hotspot."""
 
-    cx: float        # map x % (0-100, equirectangular)
-    cy: float        # map y % (0-100)
+    # ── Legacy SVG map coordinates (0–100 %) ─────────────────────────────────
+    # Kept for backward-compat while seed data still uses them.
+    # Remove once the backend returns real lat/lng from MongoDB.
+    cx: Optional[float] = None   # map x % (0-100, equirectangular)
+    cy: Optional[float] = None   # map y % (0-100)
+
+    # ── Geographic coordinates ────────────────────────────────────────────────
+    # Preferred. The frontend's intelligenceProvider derives these from cx/cy
+    # when not provided by the backend.
+    lat: Optional[float] = None  # latitude  (-90 → +90)
+    lng: Optional[float] = None  # longitude (-180 → +180)
+
+    # ── Core event fields ─────────────────────────────────────────────────────
     label: str       # city / region label
-    count: int       # event count
+    count: int       # event count in the observation window
     severity: str    # "high" | "medium" | "low"
     category: str    # Health | Politics | Finance | Science | Conflict | Climate | General
+
+    # ── Signal characteristics ────────────────────────────────────────────────
+    confidence_score: Optional[float] = None   # 0–1 model confidence (IS misinfo)
+    virality_score:   Optional[float] = None   # raw spread multiplier (1.0 = baseline)
+    trend:            Optional[str]   = None   # "up" | "down" | "same"
+    is_coordinated:   Optional[bool]  = None   # inauthentic amplification detected
+    is_spike_anomaly: Optional[bool]  = None   # count > 3σ rolling 7-day baseline
+
+    # ── Intelligence scoring (computed by realityScoring.js on the frontend,
+    #    or by stability_scorer.py on the backend in Phase 2) ─────────────────
+    reality_score:      Optional[float] = None  # 0–100 stability score
+    risk_level:         Optional[str]   = None  # LOW | MEDIUM | HIGH | CRITICAL
+    dominant_narrative: Optional[str]   = None  # top narrative title for this hotspot
+    next_action:        Optional[str]   = None  # recommended intervention
 
 
 class RegionStats(BaseModel):
@@ -23,6 +90,11 @@ class RegionStats(BaseModel):
     events: int      # total events in last 24 h
     delta: int       # % change vs previous 24 h (positive = increase)
     severity: str    # "high" | "medium" | "low"
+
+    # ── Intelligence scoring ──────────────────────────────────────────────────
+    reality_score: Optional[float] = None  # 0–100 stability score
+    risk_level:    Optional[str]   = None  # LOW | MEDIUM | HIGH | CRITICAL
+    next_action:   Optional[str]   = None  # recommended intervention
 
 
 class NarrativeItem(BaseModel):
@@ -51,3 +123,4 @@ class StreamEvent(BaseModel):
     message: str          # human-readable feed entry
     delta: int            # count increment since last frame
     timestamp: str        # ISO-8601
+    severity: Optional[str] = None  # "high" | "medium" | "low" — for colour-coding ticker items

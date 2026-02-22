@@ -33,7 +33,7 @@
  */
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { getHeatmapEvents } from '../lib/api'
+import { getIntelligenceSnapshot } from '../lib/intelligenceProvider'
 import Globe from 'react-globe.gl'
 
 import { SimulationProvider } from '../context/SimulationContext'
@@ -50,7 +50,8 @@ import GlobeLegend from '../components/common/GlobeLegend'
 
 /* CATEGORIES moved to RightSimulationPanel.jsx */
 
-import { REGIONS, HOTSPOTS, NARRATIVES } from '../data/mockData'
+/* Mock data is now handled inside intelligenceProvider.js (auto-fallback).
+   HOTSPOTS / REGIONS / NARRATIVES no longer need to be imported here. */
 
 /* FEED_ITEMS and INITIAL_FEED_HISTORY moved to hooks/useLiveEventFeed.js */
 
@@ -90,9 +91,11 @@ export default function Heatmap() {
   const { liveFeed, feedHistory, totalEvents, autoScroll, setAutoScroll } = useLiveEventFeed()
 
   /* ── Existing state ── */
-  const [hotspots, setHotspots] = useState(HOTSPOTS)
-  const [regions, setRegions] = useState(REGIONS)
-  const [narratives, setNarratives] = useState(NARRATIVES)
+  // Start empty — fetchHeatmap() (called in useEffect below) populates these
+  // via intelligenceProvider which auto-falls-back to mock data if Atlas is down.
+  const [hotspots, setHotspots] = useState([])
+  const [regions, setRegions] = useState([])
+  const [narratives, setNarratives] = useState([])
   const [mapW, setMapW] = useState(0)
   const [mapH, setMapH] = useState(0)
   const [countries, setCountries] = useState({ features: [] })
@@ -158,26 +161,20 @@ export default function Heatmap() {
   }, [feedHistory, autoScroll])
 
   /* ── Periodic heatmap fetch ──
-   * API INTEGRATION: getHeatmapEvents() → GET /api/v1/heatmap?hours=24
-   * Pass timeRange-mapped hours: { '1h': 1, '24h': 24, '7d': 168 }
-   * Response: { events, regions, narratives, total_events }
+   * Uses intelligenceProvider.getIntelligenceSnapshot() which:
+   *   1. Tries GET /api/v1/heatmap (Atlas mode)
+   *   2. Falls back to mock data automatically on any failure
+   *   3. Enriches every event with reality_score, risk_level, next_action
+   *
+   * The `mode` field in the response ('atlas' | 'mock') can be used to
+   * show a data-source indicator in the UI (future enhancement).
    */
   const fetchHeatmap = useCallback(async () => {
-    try {
-      const data = await getHeatmapEvents()
-      if (data && data.events && data.events.length > 0) {
-        setHotspots(data.events)
-        if (data.regions) setRegions(data.regions)
-        if (data.narratives) setNarratives(data.narratives)
-      } else {
-        throw new Error('API returned empty or invalid data')
-      }
-      // totalEvents is managed by useLiveEventFeed (WebSocket stream)
-    } catch (_) {
-      setHotspots(HOTSPOTS)
-      setRegions(REGIONS)
-      setNarratives(NARRATIVES)
-    }
+    const snapshot = await getIntelligenceSnapshot()
+    setHotspots(snapshot.events)
+    setRegions(snapshot.regions)
+    setNarratives(snapshot.narratives)
+    // totalEvents is managed by useLiveEventFeed (WebSocket stream)
   }, [])
 
   useEffect(() => {
