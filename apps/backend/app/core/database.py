@@ -15,6 +15,7 @@ on shutdown — this is the recommended pattern over @app.on_event.
 import logging
 import re
 
+import certifi
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from app.core.config import settings
@@ -54,6 +55,7 @@ async def connect_to_mongo() -> None:
             settings.mongo_uri,
             # Fail fast in tests; real deployments use the URI default (30s)
             serverSelectionTimeoutMS=5000,
+            tlsCAFile=certifi.where(),
         )
         db_client.db = db_client.client[settings.mongo_db_name]
         # Validate connection immediately — don't wait for first query
