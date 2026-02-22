@@ -4,17 +4,16 @@
 
 ## What it does
 
-- **Fact Check**: Submit a URL or text → AI Agent Debate (Pro vs Con Gemini agents) → Verdict with sources
-- **Deepfake Detection**: Upload image/audio/video → triple-check pipeline → confidence score
+- **AI Analysis Suite**: Submit a URL, text, image, audio, or video → runs fact-check debate + deepfake detection + scam detection simultaneously
 - **Heatmap Dashboard**: World map of misinformation hotspots powered by MongoDB geospatial queries
+- **Report Archive**: Every analysis is saved; full-text search, PDF/JSON export
 - **Chrome Extension**: Non-disruptive flags on X/Instagram; highlight text → instant analysis
-- **Scam Detector**: RoBERTa + XGBoost scam/phishing classifier
 
 ## Stack
 
 | Layer      | Tech                                              |
 |------------|---------------------------------------------------|
-| Frontend   | React 18 + TypeScript + Vite + TailwindCSS        |
+| Frontend   | React 18 + Vite + TailwindCSS                     |
 | Backend    | FastAPI + Pydantic v2 + Motor (async MongoDB)     |
 | Database   | MongoDB Atlas (Vector Search, Geospatial, Streams)|
 | AI         | Gemini 1.5 Pro (deep analysis) + Flash (triage)   |
@@ -29,30 +28,64 @@ git clone <repo>
 cd HackLondon2026
 
 # 2. Copy env files (fill in API keys later — mocks work out of the box)
-cp apps/api/.env.example apps/api/.env
+cp apps/backend/.env.example apps/backend/.env
 
 # 3. Start everything
 docker compose up --build
 
-# Web:  http://localhost:5173
-# API:  http://localhost:8000
-# Docs: http://localhost:8000/docs
+# Frontend: http://localhost:5173
+# Backend:  http://localhost:8000
+# API Docs: http://localhost:8000/docs
+```
+
+### Running services individually
+
+**Backend**
+
+```bash
+cd apps/backend
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Expected output:
+```
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process using WatchFiles
+INFO:     Starting TruthGuard API (env: development)
+INFO:     MongoDB connection established (db: HackLdn)
+INFO:     Application startup complete.
+```
+
+**Frontend**
+
+```bash
+cd apps/frontend
+npm install
+npm run dev
+```
+
+Expected output:
+```
+  VITE v5.4.21  ready in 505 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://192.168.x.x:5173/
 ```
 
 ## Running tests
 
 ```bash
-# API (pytest)
-cd apps/api && pip install -r requirements.txt
+# Backend (pytest)
+cd apps/backend && pip install -r requirements.txt
 pytest tests/ -v
 
-# Web (vitest)
-cd apps/web && npm install
+# Frontend (vitest)
+cd apps/frontend && npm install
 npm run test
 
 # Lint + typecheck
-cd apps/api && ruff check . && ruff format --check .
-cd apps/web && npm run lint && npm run typecheck
+cd apps/backend && ruff check . && ruff format --check .
+cd apps/frontend && npm run lint
 ```
 
 ## Monorepo structure
@@ -60,17 +93,29 @@ cd apps/web && npm run lint && npm run typecheck
 ```
 /
 ├── apps/
-│   ├── web/          # React web app
-│   ├── extension/    # Chrome Extension (MV3)
-│   └── api/          # FastAPI backend
+│   ├── frontend/     # React web app  (Leena — UI/UX)
+│   ├── extension/    # Chrome Extension MV3  (Fidel)
+│   └── backend/      # FastAPI backend  (Ayo — Heatmap, Ishaan — Analysis)
 ├── packages/
 │   └── shared/       # Shared TypeScript types
 ├── infra/
 │   ├── nginx/        # Reverse proxy configs
 │   └── mongo/        # DB init scripts
 ├── docs/             # Architecture, API, deploy guides
+│   └── developers/   # Per-developer onboarding guides
 └── scripts/          # seed_db.py, dev.sh
 ```
+
+## Developer Guides
+
+Each team member has a dedicated onboarding guide:
+
+| Developer | Area | Guide |
+|-----------|------|-------|
+| **Ayo** | Heatmap (live map, MongoDB geo, WebSocket) | [docs/developers/AYO.md](docs/developers/AYO.md) |
+| **Ishaan** | AI Analysis (fact-check, deepfake, scam) | [docs/developers/ISHAAN.md](docs/developers/ISHAAN.md) |
+| **Leena** | Landing page + UI/UX (styles, components) | [docs/developers/LEENA.md](docs/developers/LEENA.md) |
+| **Fidel** | Chrome Extension (content script, popup) | [docs/developers/FIDEL.md](docs/developers/FIDEL.md) |
 
 ## Docs
 
