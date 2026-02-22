@@ -1,547 +1,739 @@
 /**
- * Heatmap.jsx — Real-time misinformation geospatial dashboard.
- *
+ * Heatmap.jsx — Misinformation Intelligence Command Center.
  * DEVELOPER: Ayo
- * ─────────────────────────────────────────────────────────────────────────────
- * This is your main frontend file. It renders the world heatmap page.
  *
- * HOW THE DATA FLOWS
- * ──────────────────
- * 1. On mount, fetchHeatmap() calls GET /api/v1/heatmap (your backend route).
- *    If the backend is down, the component silently uses the local mock data.
- * 2. The WebSocket connection to /api/v1/heatmap/stream drives the LIVE ticker
- *    at the top of the page. Each message increments the totalEvents counter.
- * 3. When the user clicks a category filter pill, the narratives and hotspot
- *    markers are filtered CLIENT-SIDE (no new API call needed).
+ * Layout: fixed full-screen flex-column
+ *   TOP BAR  (48px)    — branding, live pill, viz toggle, risk badge, clock
+ *   MAIN CONTENT (flex-1, flex-column)
+ *     ├── THREE-COLUMN BODY (flex-1)
+ *     │     LEFT  (258px) — live feed, time controls, hotspots, alert feed, location
+ *     │     CENTER (flex) — 3D globe with overlays
+ *     │     RIGHT (300px) — hotspot panel, simulation, category filter, narratives
+ *     └── BOTTOM AI FEED (115px) — auto-scrolling real-time event log
  *
- * THE COORDINATE SYSTEM (important for adding new hotspots)
- * ──────────────────────────────────────────────────────────
- * The world map is an SVG where cx and cy are PERCENTAGES (0–100):
- *   cx = 0   → left edge of the map
- *   cx = 100 → right edge of the map
- *   cy = 0   → top edge (North Pole)
- *   cy = 100 → bottom edge (South Pole)
+ * Features:
+ *   1. Geospatial Heat Layer  — view modes Global/Country/City + intensity sizing
+ *   2. Time Intelligence      — 1h/24h/7d selector + animated playback
+ *   3. Multi-select Filters   — Set-based category pills
+ *   4. Confidence Mode        — Volume vs Risk (count × confidence × virality)
+ *   5. Hotspot Detection Panel— click globe point → drill-down in right panel
+ *   6. Narrative Spread Arcs  — animated arcs connecting same-category hotspots
+ *   7. Real-time Updates      — coordinated/spike hotspots pulse faster
+ *   8. Alert Layer            — coordinated campaign + spike anomaly feed
+ *   9. Personalization Mode   — geolocation → auto-focus globe
+ *  10. Live AI Feed (bottom)  — auto-scrolling event log from WebSocket stream
+ *  11. Predictive Simulation  — "Simulate Spread" + "Track Narrative" actions
  *
- * The `scale` variable converts percentages to actual pixels:
- *   scale = mapW / 100   (e.g. if the map is 800px wide, scale = 8)
- *   pixel_x = cx * scale (e.g. cx=22 → 22 * 8 = 176px from left)
- *
- * To add a new hotspot city, just append to the HOTSPOTS array below with
- * the approximate lat/lng converted to SVG percentage coordinates.
- * Use Google Maps to find lat/lng, then approximate:
- *   cx ≈ (longitude + 180) / 360 * 100
- *   cy ≈ (90 - latitude) / 180 * 100
- *
- * WHAT TO REPLACE WITH REAL DATA (your backend tasks)
- * ─────────────────────────────────────────────────────
- * The HOTSPOTS, REGIONS, and NARRATIVES constants below are fallback data
- * used when the backend is unavailable. Once you wire up real MongoDB:
- *   - HOTSPOTS  → comes from GET /api/v1/heatmap → response.events
- *   - REGIONS   → comes from GET /api/v1/heatmap → response.regions
- *   - NARRATIVES → comes from GET /api/v1/heatmap → response.narratives
- * The fetchHeatmap() function already handles this — it just overwrites
- * the state with real data. The mock data here is just the initial state.
- *
- * See docs/developers/AYO.md for full task list and backend guide.
+ * Data flow:
+ *   fetchHeatmap()       → GET /api/v1/heatmap every 30 s
+ *   openHeatmapStream()  → WebSocket /api/v1/heatmap/stream (live events)
+ *   getHeatmapArcs()     → GET /api/v1/heatmap/arcs (narrative arc pairs)
+ *   runSimulation()      → POST /api/v1/heatmap/simulate (predictive model)
+ *   Fallback mock data shown when backend is unavailable.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { getHeatmapEvents, openHeatmapStream } from '../lib/api'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { getIntelligenceSnapshot } from '../lib/intelligenceProvider'
+import Globe from 'react-globe.gl'
 
-/* ─── Category filter pills ──────────────────────────────────────────────── */
-// These map to the `category` field on HeatmapEvent and NarrativeItem.
-// To add a new category: add it here AND ensure your backend data uses the same string.
-const CATEGORIES = ['All', 'Health', 'Politics', 'Finance', 'Science', 'Conflict', 'Climate']
+import { SimulationProvider } from '../context/SimulationContext'
+import { useLiveEventFeed } from '../hooks/useLiveEventFeed'
+import TopControlBar from '../components/heatmap/TopControlBar'
+import LeftControlPanel from '../components/heatmap/LeftControlPanel'
+import RightSimulationPanel from '../components/heatmap/RightSimulationPanel'
+import GlobeOverlayLayer from '../components/heatmap/GlobeOverlayLayer'
+import SearchBar from '../components/common/SearchBar'
+import GlobeLegend from '../components/common/GlobeLegend'
+import RegionIntelPanel from '../components/heatmap/RegionIntelPanel'
 
-/* ─── Fallback region stats ──────────────────────────────────────────────── */
-// Used when the backend is unavailable. In production these are replaced
-// by MongoDB $group aggregation results (see heatmap.py _REGIONS).
-// delta = % change vs previous 24 h (positive = more misinformation, shown in red)
-const REGIONS = [
-  { name: 'North America', events: 847,  delta: +12, severity: 'high'   },
-  { name: 'Europe',        events: 623,  delta: +5,  severity: 'medium' },
-  { name: 'Asia Pacific',  events: 1204, delta: +31, severity: 'high'   },
-  { name: 'South America', events: 391,  delta: -4,  severity: 'medium' },
-  { name: 'Africa',        events: 278,  delta: +8,  severity: 'low'    },
-  { name: 'Middle East',   events: 512,  delta: +19, severity: 'high'   },
-]
 
-/* ─── Fallback hotspot markers ───────────────────────────────────────────── */
-// cx, cy are SVG percentage coordinates (0–100). See coordinate system note above.
-// severity controls dot size and colour. count shows in the hover tooltip.
-// category is used by the category filter pills.
-const HOTSPOTS = [
-  { cx: 22,  cy: 38,  label: 'New York',    count: 312, severity: 'high',   category: 'Health'   },
-  { cx: 16,  cy: 43,  label: 'Los Angeles', count: 198, severity: 'medium', category: 'Politics' },
-  { cx: 47,  cy: 32,  label: 'London',      count: 245, severity: 'high',   category: 'Health'   },
-  { cx: 49,  cy: 30,  label: 'Berlin',      count: 134, severity: 'medium', category: 'Climate'  },
-  { cx: 53,  cy: 33,  label: 'Moscow',      count: 389, severity: 'high',   category: 'Politics' },
-  { cx: 72,  cy: 38,  label: 'Beijing',     count: 521, severity: 'high',   category: 'Science'  },
-  { cx: 76,  cy: 44,  label: 'Tokyo',       count: 287, severity: 'medium', category: 'Finance'  },
-  { cx: 70,  cy: 50,  label: 'Delhi',       count: 403, severity: 'high',   category: 'Health'   },
-  { cx: 28,  cy: 60,  label: 'São Paulo',   count: 176, severity: 'medium', category: 'Politics' },
-  { cx: 50,  cy: 55,  label: 'Cairo',       count: 218, severity: 'medium', category: 'Conflict' },
-  { cx: 54,  cy: 62,  label: 'Nairobi',     count: 92,  severity: 'low',    category: 'Health'   },
-  { cx: 55,  cy: 43,  label: 'Tehran',      count: 267, severity: 'high',   category: 'Conflict' },
-  { cx: 79,  cy: 67,  label: 'Jakarta',     count: 145, severity: 'medium', category: 'Health'   },
-]
+/* ─── Constants ──────────────────────────────────────────────────────────── */
 
-/* ─── Fallback trending narratives ──────────────────────────────────────── */
-// Shown in the table below the map. In production these come from
-// GET /api/v1/heatmap → response.narratives (ranked by social media volume).
-const NARRATIVES = [
-  { rank: 1, title: 'Vaccine microchip conspiracy resurfaces ahead of flu season',    category: 'Health',   volume: 14200, trend: 'up'   },
-  { rank: 2, title: 'AI-generated election footage spreads across social platforms',  category: 'Politics', volume: 11800, trend: 'up'   },
-  { rank: 3, title: 'Manipulated climate data graph shared by influencers',           category: 'Climate',  volume: 9400,  trend: 'up'   },
-  { rank: 4, title: 'False banking collapse rumour triggers regional bank run',       category: 'Finance',  volume: 7600,  trend: 'down' },
-  { rank: 5, title: 'Doctored satellite images misidentify conflict zone locations',  category: 'Conflict', volume: 6300,  trend: 'up'   },
-  { rank: 6, title: '"Miracle cure" claims spread via encrypted messaging apps',     category: 'Health',   volume: 5100,  trend: 'same' },
-]
 
-/* ─── Severity → colour mapping ──────────────────────────────────────────── */
-// ring  = outer pulse ring and legend dot colour
-// fill  = semi-transparent dot fill
-// label = text shown in the legend and RegionCard badge
-// text  = colour used for percentage text on the RegionCard
+/* CATEGORIES moved to RightSimulationPanel.jsx */
+
+/* Mock data is now handled inside intelligenceProvider.js (auto-fallback).
+   HOTSPOTS / REGIONS / NARRATIVES no longer need to be imported here. */
+
+/* FEED_ITEMS and INITIAL_FEED_HISTORY moved to hooks/useLiveEventFeed.js */
+
+
 const SEV = {
-  high:   { ring: '#ef4444', fill: 'rgba(239,68,68,0.5)',   label: 'High',   text: '#ef4444' },
-  medium: { ring: '#f59e0b', fill: 'rgba(245,158,11,0.5)',  label: 'Medium', text: '#f59e0b' },
-  low:    { ring: '#10b981', fill: 'rgba(16,185,129,0.5)',  label: 'Low',    text: '#10b981' },
+  high: { ring: '#ef4444', label: 'High', text: '#ef4444' },
+  medium: { ring: '#f59e0b', label: 'Medium', text: '#f59e0b' },
+  low: { ring: '#10b981', label: 'Low', text: '#10b981' },
 }
 
-/* ─── Live feed ticker messages ──────────────────────────────────────────── */
-// Fallback used when the WebSocket isn't available (test env / API down).
-// In production these come from the WebSocket stream (background/index.ts → Change Streams).
-const FEED_ITEMS = [
-  'New event detected · Health · Jakarta',
-  'Spike alert · Politics · Washington DC (+34%)',
-  'Cluster identified · Finance · London',
-  'Narrative variant · Climate · Berlin',
-  'Agent verdict: FALSE · Health · New York',
-  'Trending narrative · Science · Tokyo',
-]
-
-/* ─── RegionCard sub-component ───────────────────────────────────────────── */
-// Renders one continent stat card with a progress bar.
-// pct = events / 1300 * 100 — 1300 is the approximate max seen (Asia Pacific peak)
-// You may want to make this dynamic once real data comes in.
-function RegionCard({ region }) {
-  const sev = SEV[region.severity]
-  const pct = Math.min(100, (region.events / 1300) * 100)
-  return (
-    <div
-      className="rounded-xl p-5"
-      style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
-    >
-      <div className="flex items-start justify-between mb-3">
-        <p className="text-white text-sm font-semibold">{region.name}</p>
-        <span
-          className="text-xs px-2 py-0.5 rounded-full font-medium"
-          style={{ background: `${sev.ring}18`, color: sev.text, border: `1px solid ${sev.ring}40` }}
-        >
-          {sev.label}
-        </span>
-      </div>
-
-      <p className="text-3xl font-black text-white mb-1">{region.events.toLocaleString()}</p>
-      <p className="text-xs text-slate-600 mb-3">events last 24 h</p>
-
-      {/* Progress bar — width = (events / max_events) % */}
-      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
-        <div
-          className="h-full rounded-full transition-all duration-700"
-          style={{ width: `${pct}%`, background: sev.ring }}
-        />
-      </div>
-
-      {/* delta: positive = more misinformation → red, negative = less → green */}
-      <p className="text-xs mt-2" style={{ color: region.delta >= 0 ? '#ef4444' : '#10b981' }}>
-        {region.delta >= 0 ? '↑' : '↓'} {Math.abs(region.delta)}% from yesterday
-      </p>
-    </div>
-  )
+// Risk-level colors for globe visual encoding.
+// When a hotspot has a computed risk_level, we use these instead of SEV
+// to make the "intelligence-scored" view visually distinct.
+const RISK_COLOR = {
+  CRITICAL: '#ef4444',
+  HIGH:     '#f97316',
+  MEDIUM:   '#f59e0b',
+  LOW:      '#10b981',
 }
 
-/* ─── HotspotMarker sub-component ────────────────────────────────────────── */
-// Renders a pulsing dot on the SVG map for one city.
-// transform={`translate(${spot.cx * scale}, ${spot.cy * scale})`}
-//   → converts percentage coords to pixel coords for the current map width.
-// r (radius) is scaled proportionally: high severity = larger dot.
-// The tooltip is a foreignObject that renders HTML inside SVG (widely supported).
-function HotspotMarker({ spot, scale }) {
-  const [hovered, setHovered] = useState(false)
-  const sev = SEV[spot.severity]
-  // Dot radius in percentage units: high=1.4, medium=1.1, low=0.8
-  // Multiplied by scale to get pixel radius.
-  const r = spot.severity === 'high' ? 1.4 : spot.severity === 'medium' ? 1.1 : 0.8
-  return (
-    <g
-      transform={`translate(${spot.cx * scale}, ${spot.cy * scale})`}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{ cursor: 'pointer' }}
-    >
-      {/* Outer pulse ring — animated via CSS 'pulse' keyframe in index.css */}
-      <circle
-        r={r * scale * 0.7}
-        fill="none"
-        stroke={sev.ring}
-        strokeWidth="0.5"
-        opacity={0.4}
-        style={{ animation: 'pulse 2s ease-in-out infinite' }}
-      />
-      {/* Inner solid dot */}
-      <circle r={r * scale * 0.35} fill={sev.fill} stroke={sev.ring} strokeWidth="0.3" />
-      {/* Hover tooltip — uses foreignObject to render HTML inside SVG */}
-      {hovered && (
-        <foreignObject x={4} y={-18} width={110} height={40} style={{ overflow: 'visible' }}>
-          <div
-            style={{
-              background: 'rgba(4,4,10,0.95)',
-              border: `1px solid ${sev.ring}40`,
-              borderRadius: 8,
-              padding: '4px 8px',
-              fontSize: 10,
-              color: '#f1f5f9',
-              whiteSpace: 'nowrap',
-              pointerEvents: 'none',
-            }}
-          >
-            <span style={{ color: sev.ring, fontWeight: 700 }}>{spot.label}</span>
-            <br />
-            {spot.count.toLocaleString()} events
-          </div>
-        </foreignObject>
-      )}
-    </g>
-  )
+// Returns the best available color for a hotspot — risk_level takes priority over raw severity.
+function spotColor(s) {
+  return s.risk_level ? (RISK_COLOR[s.risk_level] ?? SEV[s.severity]?.ring ?? '#60a5fa')
+                      : (SEV[s.severity]?.ring ?? '#60a5fa')
 }
 
-/* ─── Simplified equirectangular world outline as SVG path ───────────────── */
-// This is a hand-crafted low-polygon world silhouette.
-// Coordinates are in the same 0-100 percentage space as cx/cy.
-// The WORLD_PATH regex in the render block scales these to pixel coords.
-const WORLD_PATH = `
-M8,35 L10,30 L14,28 L18,29 L22,27 L26,28 L28,32 L30,30
-L33,29 L36,30 L38,28 L40,30 L42,28 L44,30 L47,29 L49,27
-L52,28 L54,26 L58,27 L62,29 L66,28 L70,30 L73,27 L76,28
-L80,30 L84,28 L87,30 L90,35
-L90,65 L85,68 L80,65 L76,68 L72,66 L68,70 L64,68 L60,72
-L56,70 L52,72 L48,70 L44,72 L40,70 L36,72 L32,70 L28,72
-L24,68 L20,70 L16,68 L12,65 L8,65 Z
-`
+const TIME_RANGES = ['1h', '24h', '7d']
 
-/* ─── Main component ─────────────────────────────────────────────────────── */
+/* ─── Helpers ────────────────────────────────────────────────────────────── */
+
+/**
+ * getDisplayCount — Feature 4: Confidence Mode.
+ * Volume: raw event count for selected time range.
+ * Risk:   count × confidence_score × virality_score (risk-weighted impact).
+ * API INTEGRATION: confidence_score + virality_score come from /api/v1/heatmap per hotspot.
+ */
+function getDisplayCount(spot, vizMode, timeRange) {
+  const base = spot.timeData?.[timeRange] ?? spot.count
+  return vizMode === 'risk'
+    ? Math.round(base * (spot.confidence_score ?? 1) * (spot.virality_score ?? 1))
+    : base
+}
+
+/* ─── Style constants ────────────────────────────────────────────────────── */
+
+/* panelBg and divider moved to panel components */
+
+// Category pill colours used in the live AI feed
+const FEED_CAT_COLOR = {
+  Health:   { bg: 'rgba(239,68,68,0.10)',  color: '#f87171', border: 'rgba(239,68,68,0.22)'  },
+  Politics: { bg: 'rgba(249,115,22,0.10)', color: '#fb923c', border: 'rgba(249,115,22,0.22)' },
+  Finance:  { bg: 'rgba(234,179,8,0.10)',  color: '#facc15', border: 'rgba(234,179,8,0.22)'  },
+  Science:  { bg: 'rgba(59,130,246,0.10)', color: '#60a5fa', border: 'rgba(59,130,246,0.22)' },
+  Conflict: { bg: 'rgba(239,68,68,0.10)',  color: '#f87171', border: 'rgba(239,68,68,0.22)'  },
+  Climate:  { bg: 'rgba(16,185,129,0.10)', color: '#34d399', border: 'rgba(16,185,129,0.22)' },
+}
+
+// Short action prefix label per risk level (mirrors computeNextAction prefixes)
+const FEED_ACTION = { CRITICAL: 'ESCALATE', HIGH: 'ALERT', MEDIUM: 'MONITOR', LOW: 'LOG' }
+
+/* ─── Component ──────────────────────────────────────────────────────────── */
 
 export default function Heatmap() {
-  // category: the active filter pill ('All' means no filter)
-  const [category,    setCategory]    = useState('All')
-  // liveFeed: text shown in the LIVE ticker strip at the top
-  const [liveFeed,    setLiveFeed]    = useState(FEED_ITEMS[0])
-  // totalEvents: the global counter shown in the top-right badge
-  //              incremented by WebSocket delta messages
-  const [totalEvents, setTotalEvents] = useState(55234)
-  // hotspots, regions, narratives: replaced with real API data on mount
-  const [hotspots,    setHotspots]    = useState(HOTSPOTS)
-  const [regions,     setRegions]     = useState(REGIONS)
-  const [narratives,  setNarratives]  = useState(NARRATIVES)
-  // mapRef: ref to the map container div, used by the ResizeObserver
-  const mapRef = useRef(null)
-  // wsRef: ref to the open WebSocket, used for cleanup on unmount
-  const wsRef  = useRef(null)
-  // mapW: current pixel width of the map container (drives scale calculation)
-  const [mapW, setMapW] = useState(800)
 
-  /* ResizeObserver — makes the SVG map responsive
-   * Instead of a fixed width, we track the container's actual rendered width.
-   * When the window is resized or the layout shifts, mapW updates,
-   * which recalculates scale = mapW / 100, moving all hotspot dots correctly.
-   */
+  /* ── Live feed + WS state — managed by hook ── */
+  const { liveFeed, feedHistory, totalEvents, autoScroll, setAutoScroll } = useLiveEventFeed()
+
+  /* ── Existing state ── */
+  // Start empty — fetchHeatmap() (called in useEffect below) populates these
+  // via intelligenceProvider which auto-falls-back to mock data if Atlas is down.
+  const [hotspots, setHotspots] = useState([])
+  const [regions, setRegions] = useState([])
+  const [narratives, setNarratives] = useState([])
+  const [mapW, setMapW] = useState(0)
+  const [mapH, setMapH] = useState(0)
+  const [countries, setCountries] = useState({ features: [] })
+  const [now, setNow] = useState(new Date())
+
+  /* ── Feature 2: Time Intelligence ── */
+  const [timeRange, setTimeRange] = useState('24h')
+  const [isPlaying, setIsPlaying] = useState(false)
+
+  /* ── Location search ── */
+  const [locationQuery, setLocationQuery] = useState('')
+  const [locationSearching, setLocationSearching] = useState(false)
+  const [searchedLocation, setSearchedLocation] = useState(null) // { lat, lng, name }
+
+  /* ── Feature 4: Viz mode ── */
+  const [vizMode, setVizMode] = useState('risk')
+
+  /* ── Feature 3: Multi-select categories ── */
+  const [multiCats, setMultiCats] = useState(new Set())
+
+  /* ── Feature 5: Hotspot Detection Panel ── */
+  const [selectedHotspot, setSelectedHotspot] = useState(null)
+
+  /* Feature 11 simulation state is managed by SimulationContext + useSimulation hook */
+  /* Feature 10 feed state (feedHistory, autoScroll) comes from useLiveEventFeed above */
+
+  /* ── Feature 9: Geolocation ── */
+  const [userLocation, setUserLocation] = useState(null)
+  const [locationError, setLocationError] = useState(null)
+
+  const mapRef = useRef(null)
+  const globeRef = useRef(null)
+  const feedRef = useRef(null)
+
+  /* ── Live clock ── */
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  /* ── Country GeoJSON ── */
+  useEffect(() => {
+    fetch('https://raw.githubusercontent.com/vasturiano/react-globe.gl/master/example/datasets/ne_110m_admin_0_countries.geojson')
+      .then(r => r.json()).then(setCountries).catch(console.error)
+  }, [])
+
+  /* ── Globe container dimensions ── */
   useEffect(() => {
     if (!mapRef.current) return
-    const ro = new ResizeObserver(([e]) => setMapW(e.contentRect.width))
+    const ro = new ResizeObserver(([e]) => {
+      setMapW(e.contentRect.width)
+      setMapH(e.contentRect.height)
+    })
     ro.observe(mapRef.current)
     return () => ro.disconnect()
   }, [])
 
-  /* Fetch heatmap snapshot from API on mount
-   * The API response matches the same data shape as the mock constants:
-   *   { events: HeatmapEvent[], regions: RegionStats[], narratives: NarrativeItem[], total_events: number }
-   * If the backend is down or returns an error, we silently keep the mock data
-   * (the catch block intentionally does nothing).
+  /* ── Feed auto-scroll ── */
+  useEffect(() => {
+    if (autoScroll && feedRef.current) {
+      feedRef.current.scrollTop = feedRef.current.scrollHeight
+    }
+  }, [feedHistory, autoScroll])
+
+  /* ── Periodic heatmap fetch ──
+   * Uses intelligenceProvider.getIntelligenceSnapshot() which:
+   *   1. Tries GET /api/v1/heatmap (Atlas mode)
+   *   2. Falls back to mock data automatically on any failure
+   *   3. Enriches every event with reality_score, risk_level, next_action
+   *
+   * The `mode` field in the response ('atlas' | 'mock') can be used to
+   * show a data-source indicator in the UI (future enhancement).
    */
   const fetchHeatmap = useCallback(async () => {
-    try {
-      const data = await getHeatmapEvents()   // GET /api/v1/heatmap
-      setHotspots(data.events)
-      setRegions(data.regions)
-      setNarratives(data.narratives)
-      setTotalEvents(data.total_events)
-    } catch (_err) {
-      // Backend unavailable — keep the mock data already in state
-    }
+    const snapshot = await getIntelligenceSnapshot()
+    setHotspots(snapshot.events)
+    setRegions(snapshot.regions)
+    setNarratives(snapshot.narratives)
+    // totalEvents is managed by useLiveEventFeed (WebSocket stream)
   }, [])
 
-  useEffect(() => { fetchHeatmap() }, [fetchHeatmap])
-
-  /* WebSocket live feed
-   * openHeatmapStream() (defined in lib/api.js) opens a WebSocket to
-   * /api/v1/heatmap/stream and calls the callback with each parsed message.
-   * Message shape: { type: 'event', message: string, delta: number, timestamp: string }
-   *   - message → shown in the LIVE ticker strip
-   *   - delta   → added to totalEvents to simulate real-time event counting
-   *
-   * Fallback to a simulated interval if WebSocket isn't available
-   * (this happens in the Vitest/jsdom test environment where WebSocket is mocked).
-   */
   useEffect(() => {
-    let ws
-    let fallbackId
-    try {
-      ws = openHeatmapStream((msg) => {
-        if (msg.message) setLiveFeed(msg.message)
-        if (msg.delta)   setTotalEvents((n) => n + msg.delta)
+    fetchHeatmap()
+    const id = setInterval(fetchHeatmap, 30000)
+    return () => clearInterval(id)
+  }, [fetchHeatmap])
+
+  /* WS live feed moved to hooks/useLiveEventFeed.js */
+
+  /* ── Feature 2: Playback ── */
+  useEffect(() => {
+    if (!isPlaying) return
+    const id = setInterval(() => {
+      setTimeRange(prev => {
+        const idx = TIME_RANGES.indexOf(prev)
+        return TIME_RANGES[(idx + 1) % TIME_RANGES.length]
       })
-      wsRef.current = ws
-    } catch (_err) {
-      // jsdom / test env: WebSocket may not be available — use interval fallback
-      let idx = 0
-      fallbackId = setInterval(() => {
-        idx = (idx + 1) % FEED_ITEMS.length
-        setLiveFeed(FEED_ITEMS[idx])
-        setTotalEvents((n) => n + Math.floor(Math.random() * 8))
-      }, 3000)
-    }
-    return () => {
-      wsRef.current?.close()
-      if (fallbackId) clearInterval(fallbackId)
-    }
+    }, 2000)
+    return () => clearInterval(id)
+  }, [isPlaying])
+
+  /* ── Feature 9: Focus globe on user location ── */
+  useEffect(() => {
+    if (!userLocation || !globeRef.current) return
+    globeRef.current.pointOfView({ lat: userLocation.lat, lng: userLocation.lng, altitude: 1.5 }, 1200)
+  }, [userLocation])
+
+  /* ── Feature 9: Geolocation ──
+   * API INTEGRATION: POST /api/v1/user/location { lat, lng } to persist preference.
+   */
+  const enableLocation = useCallback(() => {
+    if (!navigator.geolocation) { setLocationError('Not supported'); return }
+    navigator.geolocation.getCurrentPosition(
+      pos => { setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setLocationError(null) },
+      () => setLocationError('Permission denied'),
+    )
   }, [])
 
-  // mapH = 42% of width — maintains a 2.38:1 aspect ratio for the world map
-  const mapH  = Math.round(mapW * 0.42)
-  // scale converts percentage coordinates (0–100) to pixel coordinates.
-  // e.g. London at cx=47 → 47 * (800/100) = 376px from the left of the map.
-  const scale = mapW / 100
+  /* ── Location search — geocodes a place name and flies the globe to it ── */
+  const searchLocation = useCallback(async (query) => {
+    const q = (query ?? locationQuery).trim()
+    if (!q || !globeRef.current) return
+    setLocationSearching(true)
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`)
+      const data = await res.json()
+      if (data.length > 0) {
+        const { lat, lon, display_name } = data[0]
+        const parsedLat = parseFloat(lat)
+        const parsedLng = parseFloat(lon)
+        setSearchedLocation({ lat: parsedLat, lng: parsedLng, name: display_name.split(',')[0] })
+        globeRef.current.pointOfView({ lat: parsedLat, lng: parsedLng, altitude: 1.2 }, 1000)
+      }
+    } catch (_) { /* ignore network errors */ } finally {
+      setLocationSearching(false)
+    }
+  }, [locationQuery])
 
-  /* Client-side category filter
-   * When a filter pill is clicked, we filter the already-loaded data in memory.
-   * No new API call is needed — this keeps the UI snappy.
+  /* ── Feature 3: Multi-select ── */
+  const toggleCat = useCallback((c) => {
+    if (c === 'All') { setMultiCats(new Set()); return }
+    setMultiCats(prev => {
+      const next = new Set(prev)
+      next.has(c) ? next.delete(c) : next.add(c)
+      return next
+    })
+  }, [])
+
+  const catActive = useCallback((c) => {
+    if (c === 'All') return multiCats.size === 0
+    return multiCats.has(c)
+  }, [multiCats])
+
+  /* ── Region polygon click (Phase 4) ── */
+  const [selectedRegionData, setSelectedRegionData] = useState(null)
+
+  /* ── Helpers ─────────────────────────────────────────────────────────── */
+
+  // Compute the centroid of a GeoJSON polygon feature.
+  // Handles both Polygon and MultiPolygon types.
+  function getFeatureCentroid(feature) {
+    try {
+      const coords = feature.geometry.type === 'MultiPolygon'
+        ? feature.geometry.coordinates[0][0]
+        : feature.geometry.coordinates[0]
+      const lng = coords.reduce((s, p) => s + p[0], 0) / coords.length
+      const lat = coords.reduce((s, p) => s + p[1], 0) / coords.length
+      return { lat, lng }
+    } catch (_) {
+      return { lat: 0, lng: 0 }
+    }
+  }
+
+  // Map a lat/lng centroid to a macro-region name matching our RegionStats data.
+  function centroidToRegionName(lat, lng) {
+    if (lat > 15  && lng > -170 && lng < -60)  return 'North America'
+    if (lat < 15  && lat > -60  && lng > -90  && lng < -30) return 'South America'
+    if (lat > 35  && lng > -15  && lng < 45)  return 'Europe'
+    if (lat > 12  && lat < 42   && lng > 25   && lng < 65)  return 'Middle East'
+    if (lat > -40 && lat < 40   && lng > -20  && lng < 55)  return 'Africa'
+    return 'Asia Pacific'
+  }
+
+  /* ── Polygon click handler ── */
+  const handlePolygonClick = useCallback((feature) => {
+    const countryName = feature.properties?.ADMIN ?? feature.properties?.NAME ?? 'Unknown'
+    const centroid    = getFeatureCentroid(feature)
+    const regionName  = centroidToRegionName(centroid.lat, centroid.lng)
+    const region      = regions.find(r => r.name === regionName) ?? null
+
+    // Find hotspots within ~30° of the centroid (rough geographic cluster)
+    const cluster = hotspots.filter(h => {
+      if (h.lat == null || h.lng == null) return false
+      return Math.hypot(h.lat - centroid.lat, h.lng - centroid.lng) < 30
+    }).sort((a, b) => (a.reality_score ?? 50) - (b.reality_score ?? 50))
+
+    // Pick nearest hotspot as the primary signal source
+    const nearest = cluster.reduce((best, h) => {
+      const d = Math.hypot(h.lat - centroid.lat, h.lng - centroid.lng)
+      return d < best.d ? { h, d } : best
+    }, { h: null, d: Infinity }).h
+
+    setSelectedRegionData({ countryName, centroid, region, hotspotCluster: cluster, nearestHotspot: nearest })
+    // Close the hotspot detail panel when switching to region view
+    setSelectedHotspot(null)
+  }, [regions, hotspots])
+
+  /* ── Feature 5: Point click ── */
+  const handlePointClick = useCallback((spot) => {
+    setSelectedHotspot(spot)
+    setSelectedRegionData(null) // close region panel when opening hotspot panel
+  }, [])
+
+  /* ── Feature 7: Ring speed for anomalies ── */
+  const ringSpeed = useCallback((s) => s.isCoordinated || s.isSpikeAnomaly ? 4.5 : 2.5, [])
+  const ringPeriod = useCallback((s) => s.isCoordinated || s.isSpikeAnomaly ? 500 : 900, [])
+
+  /* ── Feature 4: Point radius scales with virality in risk mode ── */
+  const pointRadius = useCallback((s) => {
+    const base = s.severity === 'high' ? 0.55 : s.severity === 'medium' ? 0.4 : 0.28
+    const boost = vizMode === 'risk' ? Math.min((s.virality_score ?? 1) * 0.12, 0.28) : 0
+    return base + boost
+  }, [vizMode])
+
+  /* Feature 11 simulation + trackNarrative moved to hooks/useSimulation.js + RightSimulationPanel */
+
+  /* ── Derived data ── */
+
+  const globeSpots = useMemo(() =>
+    hotspots
+      .filter(h => multiCats.size === 0 || multiCats.has(h.category))
+      .map(spot => ({
+        ...spot,
+        displayCount: getDisplayCount(spot, vizMode, timeRange),
+      })),
+    [hotspots, multiCats, vizMode, timeRange],
+  )
+
+
+  const filteredNarratives = useMemo(() =>
+    narratives.filter(n => multiCats.size === 0 || multiCats.has(n.category)),
+    [narratives, multiCats],
+  )
+
+  // Search result marker — shown as a single label on the globe
+  const searchMarkers = useMemo(() =>
+    searchedLocation ? [searchedLocation] : [],
+    [searchedLocation],
+  )
+
+  const maxSeverity = globeSpots.some(s => s.severity === 'high') ? 'HIGH'
+    : globeSpots.some(s => s.severity === 'medium') ? 'MEDIUM' : 'LOW'
+  const maxSevColor = maxSeverity === 'HIGH' ? '#ef4444' : maxSeverity === 'MEDIUM' ? '#f59e0b' : '#10b981'
+
+  /* ── Global Reality Stability Score ───────────────────────────────────────
+   * Weighted average of all region reality_scores (populated by intelligenceProvider).
+   * Drives the top-bar gauge and the global risk level badge.
    */
-  const filtered = narratives.filter(
-    (n) => category === 'All' || n.category === category,
-  )
-  const visibleSpots = hotspots.filter(
-    (h) => category === 'All' || h.category === category,
-  )
+  const globalStabilityScore = useMemo(() => {
+    const scored = regions.filter(r => r.reality_score != null)
+    if (!scored.length) return null
+    return Math.round(scored.reduce((s, r) => s + r.reality_score, 0) / scored.length)
+  }, [regions])
 
+  const globalRiskLevel = useMemo(() => {
+    if (globalStabilityScore == null) return maxSeverity
+    if (globalStabilityScore < 40) return 'CRITICAL'
+    if (globalStabilityScore < 60) return 'HIGH'
+    if (globalStabilityScore < 80) return 'MEDIUM'
+    return 'LOW'
+  }, [globalStabilityScore, maxSeverity])
+
+  /* ── Render ── */
   return (
-    <div className="relative max-w-7xl mx-auto px-5 py-14">
+    <SimulationProvider>
+      <div style={{
+        position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column',
+        background: '#04070f', color: '#cbd5e1',
+        fontFamily: "'Inter', system-ui, sans-serif",
+        overflow: 'hidden', zIndex: 10,
+      }}>
 
-      {/* ── Background orbs (decorative blurred circles, see index.css .orb) ── */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden>
-        <div className="orb orb-blue"   style={{ width: 600, height: 600, top: '-5%',  left: '-15%',  opacity: 0.07 }} />
-        <div className="orb orb-violet" style={{ width: 500, height: 500, bottom: '0', right: '-10%', opacity: 0.06 }} />
-      </div>
+        {/* ══════════════════════ TOP BAR ══════════════════════ */}
+        <TopControlBar
+          vizMode={vizMode}
+          setVizMode={setVizMode}
+          now={now}
+          maxSeverity={maxSeverity}
+          maxSevColor={maxSevColor}
+          totalEvents={totalEvents}
+          globalStabilityScore={globalStabilityScore}
+          globalRiskLevel={globalRiskLevel}
+        />
 
-      {/* ── Page header ── */}
-      <div className="mb-10 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-xs text-blue-400 uppercase tracking-[3px] font-semibold mb-2">
-            Live Data
-          </p>
-          <h1 className="text-4xl font-extrabold text-white mb-1">Misinformation Heatmap</h1>
-          <p className="text-slate-500 text-sm">
-            Real-time geospatial tracking via MongoDB Change Streams
-          </p>
-        </div>
+        {/* ══════════════════════ MAIN CONTENT ══════════════════════ */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
 
-        {/* Live counter — updated by WebSocket delta messages */}
-        <div
-          className="flex items-center gap-3 px-5 py-3 rounded-xl"
-          style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)' }}
-        >
-          <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse shrink-0" />
-          <div>
-            <p className="text-2xl font-black text-white leading-none">{totalEvents.toLocaleString()}</p>
-            <p className="text-xs text-blue-400 mt-0.5">events tracked</p>
-          </div>
-        </div>
-      </div>
+          {/* ═══════════════ 3-COLUMN BODY ═══════════════ */}
+          <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
 
-      {/* ── Live feed ticker strip ── */}
-      {/* key={liveFeed} triggers CSS fadeIn animation every time the text changes */}
-      <div
-        className="flex items-center gap-3 rounded-xl px-5 py-3 mb-8 overflow-hidden"
-        style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
-      >
-        <span
-          className="shrink-0 text-xs font-bold px-2 py-0.5 rounded-full text-blue-400"
-          style={{ background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.25)' }}
-        >
-          LIVE
-        </span>
-        <p
-          key={liveFeed}
-          className="text-sm text-slate-400 truncate"
-          style={{ animation: 'fadeIn 0.4s ease-out both' }}
-        >
-          {liveFeed}
-        </p>
-      </div>
+            {/* ════ LEFT PANEL ════ */}
+            <LeftControlPanel
+              liveFeed={liveFeed}
+              globeSpots={globeSpots}
+              selectedHotspot={selectedHotspot}
+              setSelectedHotspot={setSelectedHotspot}
+              regions={regions}
+              timeRange={timeRange}
+              setTimeRange={setTimeRange}
+              isPlaying={isPlaying}
+              setIsPlaying={setIsPlaying}
+              vizMode={vizMode}
+              userLocation={userLocation}
+              enableLocation={enableLocation}
+              locationError={locationError}
+            />
+            {/* ════ CENTER: Globe ════ */}
+            <div ref={mapRef} style={{ flex: 1, position: 'relative', overflow: 'hidden', background: '#020509', minWidth: 0 }}>
 
-      {/* ── SVG World Map ── */}
-      <div
-        ref={mapRef}           // ResizeObserver watches this div's width
-        className="rounded-2xl overflow-hidden mb-8 relative"
-        style={{
-          background: 'rgba(6,16,36,0.9)',
-          border:     '1px solid rgba(59,130,246,0.15)',
-          height:     mapH || 336,
-        }}
-      >
-        {/* Decorative grid lines at 10% intervals */}
-        <svg
-          width="100%"
-          height="100%"
-          style={{ position: 'absolute', inset: 0, opacity: 0.06 }}
-        >
-          {[10, 20, 30, 40, 50, 60, 70, 80, 90].map((v) => (
-            <g key={v}>
-              <line x1={`${v}%`} y1="0" x2={`${v}%`} y2="100%" stroke="#3b82f6" strokeWidth="0.5" />
-              <line x1="0" y1={`${v}%`} x2="100%" y2={`${v}%`} stroke="#3b82f6" strokeWidth="0.5" />
-            </g>
-          ))}
-        </svg>
+              <SearchBar
+                locationQuery={locationQuery}
+                setLocationQuery={setLocationQuery}
+                searchLocation={searchLocation}
+                locationSearching={locationSearching}
+                searchedLocation={searchedLocation}
+                setSearchedLocation={setSearchedLocation}
+              />
 
-        {/* Main map SVG — hotspot markers are absolutely positioned inside this */}
-        <svg
-          width={mapW}
-          height={mapH || 336}
-          viewBox={`0 0 ${mapW} ${mapH || 336}`}
-          style={{ position: 'absolute', inset: 0 }}
-        >
-          {/* Scale the WORLD_PATH percentage coords to pixel coords using regex replace.
-              Each "x,y" pair is multiplied by scale so the outline fills the container. */}
-          <path
-            d={WORLD_PATH
-              .replace(/(\d+(?:\.\d+)?),(\d+(?:\.\d+)?)/g, (_, x, y) =>
-                `${parseFloat(x) * scale},${parseFloat(y) * scale}`,
-              )}
-            fill="rgba(59,130,246,0.06)"
-            stroke="rgba(59,130,246,0.2)"
-            strokeWidth="0.8"
-          />
-
-          {/* One HotspotMarker per city — filtered by the active category pill */}
-          {visibleSpots.map((spot) => (
-            <HotspotMarker key={spot.label} spot={spot} scale={scale} />
-          ))}
-        </svg>
-
-        {/* Legend (bottom-right corner) */}
-        <div className="absolute bottom-3 right-3 flex flex-col gap-1.5">
-          {Object.entries(SEV).map(([key, val]) => (
-            <div key={key} className="flex items-center gap-1.5 text-xs text-slate-500">
-              <span className="w-2.5 h-2.5 rounded-full" style={{ background: val.ring }} />
-              {val.label}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Region stats cards (one per continent) ── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-10">
-        {regions.map((r) => <RegionCard key={r.name} region={r} />)}
-      </div>
-
-      {/* ── Trending narratives table ── */}
-      <div>
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-          <h2 className="text-xl font-bold text-white">Trending Narratives</h2>
-
-          {/* Category filter pills — clicking one sets `category` state
-              which triggers the client-side filter above */}
-          <div className="flex flex-wrap gap-2">
-            {CATEGORIES.map((c) => (
-              <button
-                key={c}
-                onClick={() => setCategory(c)}
-                className="text-xs px-3 py-1.5 rounded-full transition-all duration-150 font-medium focus:outline-none"
-                style={
-                  category === c
-                    ? { background: 'rgba(59,130,246,0.15)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.35)' }
-                    : { background: 'transparent', color: '#475569', border: '1px solid rgba(255,255,255,0.07)' }
-                }
-              >
-                {c}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div
-          className="rounded-2xl overflow-hidden"
-          style={{ border: '1px solid rgba(255,255,255,0.07)' }}
-        >
-          {/* Table header */}
-          <div
-            className="grid grid-cols-[auto_1fr_auto_auto] gap-4 px-6 py-3 text-xs text-slate-600 uppercase tracking-wider font-semibold"
-            style={{ background: 'rgba(255,255,255,0.025)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}
-          >
-            <span>#</span>
-            <span>Narrative</span>
-            <span className="hidden md:block">Category</span>
-            <span>Volume</span>
-          </div>
-
-          {filtered.length === 0 ? (
-            <p className="text-center text-slate-600 py-12 text-sm">No narratives in this category right now.</p>
-          ) : (
-            filtered.map((n) => (
-              <div
-                key={n.rank}
-                className="grid grid-cols-[auto_1fr_auto_auto] gap-4 px-6 py-4 items-center transition-colors duration-150 hover:bg-white/[0.015]"
-                style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
-              >
-                <span className="text-slate-700 font-mono text-sm w-5">{n.rank}</span>
-
-                <p className="text-slate-300 text-sm leading-snug line-clamp-2">{n.title}</p>
-
-                <span
-                  className="hidden md:inline text-xs px-2.5 py-1 rounded-full font-medium shrink-0"
-                  style={{
-                    background: 'rgba(255,255,255,0.04)',
-                    border:     '1px solid rgba(255,255,255,0.08)',
-                    color:      '#64748b',
-                  }}
-                >
-                  {n.category}
-                </span>
-
-                {/* Volume shown as "14.2k" + trend arrow */}
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <span className="text-white font-semibold text-sm">{(n.volume / 1000).toFixed(1)}k</span>
-                  <span
-                    style={{
-                      color: n.trend === 'up' ? '#ef4444' : n.trend === 'down' ? '#10b981' : '#475569',
-                      fontSize: 13,
-                    }}
-                  >
-                    {n.trend === 'up' ? '↑' : n.trend === 'down' ? '↓' : '–'}
-                  </span>
-                </div>
+              {/* Time + mode indicator — top center */}
+              <div style={{
+                position: 'absolute', top: 14, left: '50%', transform: 'translateX(-50%)',
+                zIndex: 10, pointerEvents: 'none',
+                background: 'rgba(4,7,15,0.85)', border: '1px solid rgba(255,255,255,0.07)',
+                borderRadius: 6, padding: '4px 12px',
+                fontSize: 9, fontWeight: 700, color: '#3b82f6', letterSpacing: '0.08em', whiteSpace: 'nowrap',
+              }}>
+                {timeRange.toUpperCase()} · {vizMode === 'risk' ? 'RISK-WEIGHTED' : 'VOLUME'}
+                {isPlaying && <span style={{ marginLeft: 8, color: '#ef4444' }}>▶ PLAYING</span>}
               </div>
-            ))
-          )}
-        </div>
-      </div>
 
-      {/* ── Data attribution note ── */}
-      <p className="text-center text-xs text-slate-700 mt-10 leading-relaxed">
-        Event data sourced from MongoDB Atlas geospatial aggregation · Updated via Change Streams every 30 s ·
-        Hotspot thresholds calibrated per-region to account for population density.
-      </p>
-    </div>
+
+              {mapW > 0 && mapH > 0 && (
+                <Globe
+                  ref={globeRef}
+                  width={mapW}
+                  height={mapH}
+
+                  globeImageUrl="//unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
+                  backgroundColor="rgba(0,0,0,0)"
+                  atmosphereColor="#3b82f6"
+                  atmosphereAltitude={0.18}
+                  showGraticules
+
+                  /* Country polygon overlay — highlights selected country */
+                  polygonsData={countries.features}
+                  polygonCapColor={f => {
+                    const name = f.properties?.ADMIN ?? f.properties?.NAME
+                    return name === selectedRegionData?.countryName
+                      ? 'rgba(59,130,246,0.22)'
+                      : 'rgba(18,28,50,0.45)'
+                  }}
+                  polygonSideColor={() => 'rgba(0,0,0,0)'}
+                  polygonStrokeColor={f => {
+                    const name = f.properties?.ADMIN ?? f.properties?.NAME
+                    return name === selectedRegionData?.countryName
+                      ? 'rgba(99,130,246,0.5)'
+                      : 'rgba(148,163,184,0.13)'
+                  }}
+                  polygonAltitude={f => {
+                    const name = f.properties?.ADMIN ?? f.properties?.NAME
+                    return name === selectedRegionData?.countryName ? 0.012 : 0.004
+                  }}
+                  onPolygonClick={handlePolygonClick}
+
+                  /* Search result marker label */
+                  labelsData={searchMarkers}
+                  labelLat={d => d.lat}
+                  labelLng={d => d.lng}
+                  labelText={d => `📍 ${d.name}`}
+                  labelSize={0.55}
+                  labelColor={() => '#fbbf24'}
+                  labelDotRadius={0.4}
+                  labelAltitude={0.015}
+                  labelResolution={2}
+
+                  /* Feature 7: rings — anomaly hotspots pulse faster */
+                  ringsData={globeSpots}
+                  ringColor={s => spotColor(s)}
+                  ringMaxRadius={s => s.severity === 'high' ? 9 : s.severity === 'medium' ? 6 : 4}
+                  ringPropagationSpeed={ringSpeed}
+                  ringRepeatPeriod={ringPeriod}
+
+                  pointsData={globeSpots}
+                  pointColor={p => spotColor(p)}
+                  pointAltitude={0.06}
+                  pointRadius={pointRadius}
+                  pointLabel={p => {
+                    const c = spotColor(p)
+                    const hasScore = p.reality_score != null
+                    return `
+                  <div style="background:rgba(4,7,15,0.97);border:1px solid ${c}88;border-radius:8px;padding:7px 11px;font-size:11px;white-space:nowrap;box-shadow:0 4px 20px ${c}40;max-width:240px;">
+                    <div style="color:${c};font-weight:800;font-size:13px;margin-bottom:4px;display:flex;align-items:center;gap:6px;">
+                      ${p.label}
+                      ${p.isSpikeAnomaly ? '<span style="font-size:9px;background:rgba(239,68,68,0.2);color:#ef4444;padding:1px 5px;border-radius:3px;">↑ SPIKE</span>' : ''}
+                      ${p.isCoordinated ? '<span style="font-size:9px;background:rgba(245,158,11,0.2);color:#f59e0b;padding:1px 5px;border-radius:3px;">⚡ COORD</span>' : ''}
+                    </div>
+                    ${hasScore ? `
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+                      <div style="font-size:18px;font-weight:900;color:${c};line-height:1;">${p.reality_score}</div>
+                      <div>
+                        <div style="font-size:8px;color:#475569;text-transform:uppercase;letter-spacing:0.08em;">Reality Stability</div>
+                        <span style="font-size:9px;font-weight:700;color:${c};background:${c}22;padding:1px 6px;border-radius:3px;">${p.risk_level}</span>
+                      </div>
+                    </div>` : ''}
+                    <div style="color:#64748b;margin-bottom:3px;font-size:10px;">
+                      ${p.displayCount.toLocaleString()} events · <b style="color:#94a3b8;">${p.severity}</b> · ${timeRange}
+                    </div>
+                    <div style="color:#334155;font-size:10px;">
+                      Confidence: ${Math.round((p.confidence_score ?? 0) * 100)}% · Virality: ${(p.virality_score ?? 0).toFixed(1)}×
+                    </div>
+                    ${p.next_action ? `<div style="margin-top:5px;padding:3px 6px;border-left:2px solid ${c};font-size:9px;color:${c};line-height:1.4;white-space:normal;max-width:220px;">${p.next_action}</div>` : ''}
+                  </div>`
+                  }}
+
+                  /* Feature 5: click → Hotspot Detection Panel */
+                  onPointClick={handlePointClick}
+
+                  onGlobeReady={() => {
+                    if (!globeRef.current) return
+                    const ctrl = globeRef.current.controls()
+                    ctrl.enableZoom = true
+                    ctrl.autoRotate = true
+                    ctrl.autoRotateSpeed = 0.45
+                    // Zoom range: altitude ~0.15 (street level) to 8 (full-earth view)
+                    ctrl.minDistance = 103
+                    ctrl.maxDistance = 800
+                    globeRef.current.pointOfView({ lat: 20, lng: 10, altitude: 2 })
+                  }}
+                />
+              )}
+
+              <GlobeLegend SEV={SEV} />
+
+              {/* Usage hint */}
+              <div style={{
+                position: 'absolute', bottom: 18, right: 18,
+                fontSize: 9, color: 'rgba(71,85,105,0.7)',
+                pointerEvents: 'none', userSelect: 'none',
+                textAlign: 'right', lineHeight: 1.7,
+              }}>
+                Drag to rotate · Scroll to zoom<br />Click point for details
+              </div>
+
+              {/* Simulation result overlay — pure HTML, does not touch Globe internals */}
+              <GlobeOverlayLayer />
+
+              {/* Region Intelligence overlay — shown on polygon click */}
+              <RegionIntelPanel
+                data={selectedRegionData}
+                onClose={() => setSelectedRegionData(null)}
+              />
+            </div>
+
+            {/* ════ RIGHT PANEL ════ */}
+            <RightSimulationPanel
+              selectedHotspot={selectedHotspot}
+              setSelectedHotspot={setSelectedHotspot}
+              multiCats={multiCats}
+              toggleCat={toggleCat}
+              catActive={catActive}
+              filteredNarratives={filteredNarratives}
+              timeRange={timeRange}
+              setMultiCats={setMultiCats}
+            />
+          </div>{/* end 3-column */}
+
+          {/* ════════════════ BOTTOM: LIVE AI FEED ════════════════ */}
+          <div style={{
+            height: 115, flexShrink: 0,
+            borderTop: '1px solid rgba(255,255,255,0.07)',
+            background: 'rgba(4,7,15,0.98)',
+            display: 'flex', flexDirection: 'column',
+          }}>
+            {/* Feed header */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '5px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)',
+              flexShrink: 0,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#3b82f6', boxShadow: '0 0 5px #3b82f6' }} />
+                <span style={{ fontSize: 9, fontWeight: 700, color: '#3b82f6', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                  Live AI Feed
+                </span>
+                <span style={{ fontSize: 9, color: '#1e293b' }}>
+                  {feedHistory.length} events
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {/* API INTEGRATION: WS /api/v1/heatmap/stream — each new event appends here */}
+                <span style={{ fontSize: 9, color: '#1e293b' }}>
+                  Source: <span style={{ color: '#334155' }}>WS /heatmap/stream</span>
+                </span>
+                <button onClick={() => setAutoScroll(p => !p)} style={{
+                  fontSize: 9, padding: '2px 7px', borderRadius: 3, cursor: 'pointer',
+                  border: '1px solid rgba(255,255,255,0.07)',
+                  background: autoScroll ? 'rgba(59,130,246,0.12)' : 'rgba(255,255,255,0.04)',
+                  color: autoScroll ? '#60a5fa' : '#475569',
+                }}>
+                  {autoScroll ? '⬇ Auto ON' : '⬇ Auto OFF'}
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable feed */}
+            <div
+              ref={feedRef}
+              style={{ flex: 1, overflowY: 'auto', padding: '4px 18px', display: 'flex', flexDirection: 'column', gap: 4 }}
+            >
+              {feedHistory.map((entry, idx) => {
+                const isNew  = idx === feedHistory.length - 1
+                const risk   = entry.sev === 'critical' ? 'CRITICAL'
+                             : entry.sev === 'high'     ? 'HIGH'
+                             : entry.sev === 'low'      ? 'LOW'
+                             : 'MEDIUM'
+                const rCol   = RISK_COLOR[risk]
+                const catSty = FEED_CAT_COLOR[entry.category] ?? {
+                  bg: 'rgba(255,255,255,0.04)', color: '#64748b', border: 'rgba(255,255,255,0.08)',
+                }
+                return (
+                  <div key={entry.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0,
+                    padding: '3px 6px 3px 8px', borderRadius: 4,
+                    borderLeft: `2px solid ${rCol}`,
+                    background: isNew ? `${rCol}0d` : 'transparent',
+                  }}>
+                    {/* Timestamp */}
+                    <span style={{ fontSize: 9, color: '#1e293b', fontFamily: 'monospace', flexShrink: 0, width: 52 }}>
+                      {entry.time}
+                    </span>
+                    {/* Risk badge */}
+                    <span style={{
+                      fontSize: 8, padding: '1px 5px', borderRadius: 3, flexShrink: 0, fontWeight: 800,
+                      background: `${rCol}18`, color: rCol, letterSpacing: '0.04em',
+                    }}>
+                      {risk}
+                    </span>
+                    {/* Action chip */}
+                    <span style={{
+                      fontSize: 7, padding: '1px 5px', borderRadius: 3, flexShrink: 0, fontWeight: 700,
+                      background: 'rgba(255,255,255,0.04)', color: '#334155',
+                      border: '1px solid rgba(255,255,255,0.07)', letterSpacing: '0.06em',
+                    }}>
+                      {FEED_ACTION[risk]}
+                    </span>
+                    {/* Message */}
+                    <span style={{
+                      fontSize: 10, color: '#64748b', flex: 1, minWidth: 0,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {entry.msg}
+                    </span>
+                    {/* City chip */}
+                    {entry.city && entry.city !== '—' && (
+                      <span style={{
+                        fontSize: 9, color: '#475569', fontWeight: 600, flexShrink: 0,
+                        padding: '1px 5px', borderRadius: 3, background: 'rgba(255,255,255,0.04)',
+                      }}>
+                        {entry.city}
+                      </span>
+                    )}
+                    {/* Category pill */}
+                    {entry.category && entry.category !== 'Unknown' && (
+                      <span style={{
+                        fontSize: 8, padding: '1px 6px', borderRadius: 3, flexShrink: 0, fontWeight: 600,
+                        background: catSty.bg, color: catSty.color, border: `1px solid ${catSty.border}`,
+                      }}>
+                        {entry.category}
+                      </span>
+                    )}
+                    {/* NEW flash on most-recent entry */}
+                    {isNew && (
+                      <span style={{
+                        fontSize: 7, fontWeight: 800, color: '#3b82f6', flexShrink: 0,
+                        animation: 'feedPulse 3s ease-out forwards', letterSpacing: '0.06em',
+                      }}>
+                        NEW
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
+              {feedHistory.length === 0 && (
+                <p style={{ fontSize: 10, color: '#1e293b', padding: '8px 0' }}>Connecting to event stream…</p>
+              )}
+              <style>{`
+                @keyframes feedPulse {
+                  0%   { opacity: 1; }
+                  60%  { opacity: 1; }
+                  100% { opacity: 0; }
+                }
+              `}</style>
+            </div>
+          </div>
+
+        </div>{/* end main content */}
+      </div>
+    </SimulationProvider>
   )
 }

@@ -7,11 +7,13 @@
   "permissions": [
     "activeTab",
     "storage",
-    "contextMenus"
+    "contextMenus",
+    "geolocation"
   ],
 
   "host_permissions": [
     "https://*/*",
+    "http://*/*",
     "http://localhost/*"
   ],
 
@@ -26,7 +28,18 @@
         "https://x.com/*",
         "https://twitter.com/*",
         "https://www.instagram.com/*",
-        "https://www.facebook.com/*"
+        "https://www.facebook.com/*",
+        "https://www.youtube.com/*",
+        "https://youtube.com/*",
+        "https://www.tiktok.com/*",
+        "https://tiktok.com/*",
+        "https://web.telegram.org/*",
+        "https://meet.google.com/*",
+        "https://zoom.us/*",
+        "https://*.zoom.us/*",
+        "https://app.zoom.us/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*"
       ],
       "js": ["content/index.js"],
       "css": ["content/overlay.css"],
