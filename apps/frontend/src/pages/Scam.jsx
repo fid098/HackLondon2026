@@ -118,15 +118,15 @@ export default function Scam() {
   return (
     <div className="relative max-w-3xl mx-auto px-5 py-14">
 
-      {/* ── Background orbs ── */}
+      {/* ── Background shapes ── */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden>
-        <div className="orb orb-green"  style={{ width: 450, height: 450, top: '-8%',   left: '-12%',  opacity: 0.07 }} />
-        <div className="orb orb-violet" style={{ width: 350, height: 350, bottom: '5%', right: '-10%', opacity: 0.06 }} />
+        <div className="absolute rounded-full blur-3xl" style={{ width: 450, height: 450, top: '-8%', left: '-12%', background: 'radial-gradient(circle, rgba(239,68,68,0.18), transparent 70%)' }} />
+        <div className="absolute blur-3xl" style={{ width: 350, height: 240, bottom: '5%', right: '-10%', borderRadius: '60% 40% 50% 50%', background: 'radial-gradient(circle, rgba(185,28,28,0.14), transparent 70%)' }} />
       </div>
 
       {/* ── Page header ── */}
       <div className="mb-10">
-        <p className="text-xs text-emerald-500 uppercase tracking-[3px] font-semibold mb-3">
+        <p className="text-xs text-red-500 uppercase tracking-[3px] font-semibold mb-3">
           Phase 6 · Scam Detection
         </p>
         <h1 className="text-4xl font-extrabold text-white mb-2">Scam & Phishing Checker</h1>
@@ -151,7 +151,7 @@ export default function Scam() {
         />
         <div className="flex justify-between text-xs mt-1 mb-5">
           <span className="text-slate-600">Minimum 10 characters</span>
-          <span className={text.length < 10 ? 'text-slate-600' : 'text-emerald-500'}>
+          <span className={text.length < 10 ? 'text-slate-600' : 'text-red-500'}>
             {text.length.toLocaleString()} / 2000
           </span>
         </div>
@@ -299,11 +299,6 @@ export default function Scam() {
         </div>
       )}
 
-      {/* ── Disclaimer ── */}
-      <p className="text-center text-xs text-slate-700 mt-10 max-w-xl mx-auto leading-relaxed">
-        TruthGuard scam detection is <em>probabilistic</em>. Always exercise caution with unsolicited
-        messages and verify through official channels before responding.
-      </p>
     </div>
   )
 }

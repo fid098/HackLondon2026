@@ -298,15 +298,15 @@ export default function Reports({ onNavigate }) {
   return (
     <div className="relative max-w-4xl mx-auto px-5 py-14">
 
-      {/* ── orbs ── */}
+      {/* ── background shapes ── */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden>
-        <div className="orb orb-violet" style={{ width: 500, height: 500, top: '-10%', right: '-10%', opacity: 0.08 }} />
-        <div className="orb orb-green"  style={{ width: 400, height: 400, bottom: '0', left: '-10%', opacity: 0.06 }} />
+        <div className="absolute rounded-full blur-3xl" style={{ width: 480, height: 480, top: '-10%', right: '-10%', background: 'radial-gradient(circle, rgba(239,68,68,0.18), transparent 70%)' }} />
+        <div className="absolute blur-3xl" style={{ width: 380, height: 380, bottom: '0', left: '-10%', borderRadius: '50%', background: 'radial-gradient(circle, rgba(185,28,28,0.14), transparent 70%)' }} />
       </div>
 
       {/* ── header ── */}
       <div className="mb-10">
-        <p className="text-xs text-violet-400 uppercase tracking-[3px] font-semibold mb-3">
+        <p className="text-xs text-red-500 uppercase tracking-[3px] font-semibold mb-3">
           Persistent
         </p>
         <h1 className="text-4xl font-extrabold text-white mb-2">Report Archive</h1>
@@ -444,7 +444,7 @@ export default function Reports({ onNavigate }) {
       {/* ── New report CTA ── */}
       <div
         className="mt-12 rounded-2xl p-7 flex flex-col md:flex-row items-center justify-between gap-5"
-        style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.18)' }}
+        style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.18)' }}
       >
         <div>
           <h3 className="text-white font-bold mb-1">Ready to fact-check something new?</h3>

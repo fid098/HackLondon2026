@@ -38,6 +38,40 @@ docker compose up --build
 # API Docs: http://localhost:8000/docs
 ```
 
+### Running services individually
+
+**Backend**
+
+```bash
+cd apps/backend
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Expected output:
+```
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process using WatchFiles
+INFO:     Starting TruthGuard API (env: development)
+INFO:     MongoDB connection established (db: HackLdn)
+INFO:     Application startup complete.
+```
+
+**Frontend**
+
+```bash
+cd apps/frontend
+npm install
+npm run dev
+```
+
+Expected output:
+```
+  VITE v5.4.21  ready in 505 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://192.168.x.x:5173/
+```
+
 ## Running tests
 
 ```bash
@@ -83,12 +117,107 @@ Each team member has a dedicated onboarding guide:
 | **Leena** | Landing page + UI/UX (styles, components) | [docs/developers/LEENA.md](docs/developers/LEENA.md) |
 | **Fidel** | Chrome Extension (content script, popup) | [docs/developers/FIDEL.md](docs/developers/FIDEL.md) |
 
+## Deploy on Vultr
+
+> Full guide: [docs/DEPLOY_VULTR.md](docs/DEPLOY_VULTR.md)
+
+### Step 1 — Create a VM
+
+1. Go to [vultr.com](https://vultr.com) → **Cloud Compute → Regular Performance**
+2. Pick **2 vCPU / 4 GB RAM** (Ubuntu 24.04 LTS)
+3. Firewall: open ports **22, 80, 443**
+
+### Step 2 — Prepare the VM
+
+```bash
+ssh root@<your-vultr-ip>
+apt update && apt upgrade -y
+curl -fsSL https://get.docker.com | sh
+systemctl enable docker && systemctl start docker
+apt install -y docker-compose-plugin git
+useradd -m -s /bin/bash deploy && usermod -aG docker deploy
+```
+
+### Step 3 — MongoDB Atlas
+
+1. Create a cluster at [cloud.mongodb.com](https://cloud.mongodb.com)
+2. **Database Access**: add a user with `readWrite` role
+3. **Network Access**: allow your Vultr IP
+4. Copy your connection string:
+   ```
+   mongodb+srv://<user>:<pass>@<cluster>.mongodb.net/truthguard?retryWrites=true&w=majority
+   ```
+
+### Step 4 — Clone & Configure
+
+```bash
+su deploy && cd ~
+git clone <your-repo-url> truthguard && cd truthguard
+cp apps/backend/.env.example apps/backend/.env
+nano apps/backend/.env
+```
+
+Key env vars to fill in:
+
+| Variable | Value |
+|---|---|
+| `ENVIRONMENT` | `production` |
+| `MONGO_URI` | Your Atlas connection string |
+| `GEMINI_API_KEY` | Google AI Studio key |
+| `AI_MOCK_MODE` | `false` |
+| `JWT_SECRET` | `python -c "import secrets; print(secrets.token_hex(32))"` |
+| `CORS_ORIGINS_STR` | `https://your-domain.com` |
+
+### Step 5 — Build & Start
+
+```bash
+docker compose -f docker-compose.prod.yml up --build -d
+
+# Verify everything is up
+docker compose -f docker-compose.prod.yml ps
+curl http://localhost/api/health
+```
+
+### Step 6 — TLS (recommended)
+
+```bash
+apt install -y certbot
+certbot certonly --standalone -d your-domain.com
+mkdir -p infra/nginx/certs
+cp /etc/letsencrypt/live/your-domain.com/fullchain.pem infra/nginx/certs/
+cp /etc/letsencrypt/live/your-domain.com/privkey.pem   infra/nginx/certs/
+docker compose -f docker-compose.prod.yml restart nginx
+```
+
+Auto-renew (crontab):
+```
+0 3 * * * certbot renew --quiet && docker compose -f /home/deploy/truthguard/docker-compose.prod.yml restart nginx
+```
+
+### Step 7 — DNS
+
+```
+A    your-domain.com     →  <vultr-ip>
+```
+
+### Useful commands
+
+```bash
+# View all logs
+docker compose -f docker-compose.prod.yml logs -f
+
+# Restart a service
+docker compose -f docker-compose.prod.yml restart api
+```
+
+---
+
 ## Docs
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [API Reference](docs/API.md)
 - [Extension Guide](docs/EXTENSION.md)
-- [Deploy on Vultr](docs/DEPLOY_VULTR.md)
+- [Full Vultr Deploy Guide](docs/DEPLOY_VULTR.md)
 - [Security](docs/SECURITY.md)
 
 ## Disclaimer

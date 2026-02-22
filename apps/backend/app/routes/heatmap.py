@@ -1,7 +1,7 @@
 """
 heatmap.py - Phase 3 geospatial heatmap routes.
 
-This route module serves the dashboard data and accepts user-generated flags
+This route module serves dashboard data and accepts user-generated flags
 from the browser extension so flagged AI content appears on the heatmap.
 """
 
@@ -127,34 +127,34 @@ _NARRATIVES: list[NarrativeItem] = [
 # Each entry includes city/category/severity so the frontend can render
 # colour-coded intelligence cards without parsing the message string.
 _FEED_ITEMS = [
-    {"city": "Jakarta",       "category": "Health",   "severity": "medium", "verb": "New event detected"},
-    {"city": "Washington DC", "category": "Politics", "severity": "high",   "verb": "Spike alert"},
-    {"city": "London",        "category": "Finance",  "severity": "high",   "verb": "Cluster identified"},
-    {"city": "Berlin",        "category": "Climate",  "severity": "medium", "verb": "Narrative variant"},
-    {"city": "New York",      "category": "Health",   "severity": "high",   "verb": "Agent verdict: FALSE"},
-    {"city": "Tokyo",         "category": "Science",  "severity": "medium", "verb": "Trending narrative"},
-    {"city": "Moscow",        "category": "Politics", "severity": "high",   "verb": "Coordinated activity"},
-    {"city": "Delhi",         "category": "Health",   "severity": "high",   "verb": "Spike anomaly detected"},
-    {"city": "Beijing",       "category": "Science",  "severity": "high",   "verb": "State-linked network"},
-    {"city": "Tehran",        "category": "Conflict", "severity": "high",   "verb": "Narrative flagged"},
+    {"city": "Jakarta", "category": "Health", "severity": "medium", "verb": "New event detected"},
+    {"city": "Washington DC", "category": "Politics", "severity": "high", "verb": "Spike alert"},
+    {"city": "London", "category": "Finance", "severity": "high", "verb": "Cluster identified"},
+    {"city": "Berlin", "category": "Climate", "severity": "medium", "verb": "Narrative variant"},
+    {"city": "New York", "category": "Health", "severity": "high", "verb": "Agent verdict: FALSE"},
+    {"city": "Tokyo", "category": "Science", "severity": "medium", "verb": "Trending narrative"},
+    {"city": "Moscow", "category": "Politics", "severity": "high", "verb": "Coordinated activity"},
+    {"city": "Delhi", "category": "Health", "severity": "high", "verb": "Spike anomaly detected"},
+    {"city": "Beijing", "category": "Science", "severity": "high", "verb": "State-linked network"},
+    {"city": "Tehran", "category": "Conflict", "severity": "high", "verb": "Narrative flagged"},
 ]
 
-# Neighbour cities used by the /simulate endpoint for spread projection.
-# Each entry is (city_name, base_spread_factor) — factor relative to origin count.
+# Neighbor cities used by the /simulate endpoint for spread projection.
+# Each entry is (city_name, base_spread_factor) - factor relative to origin count.
 _SPREAD_NEIGHBOURS: dict[str, list[tuple[str, float]]] = {
-    "New York":    [("Boston", 0.45), ("Philadelphia", 0.38), ("Washington DC", 0.30), ("Chicago", 0.20)],
+    "New York": [("Boston", 0.45), ("Philadelphia", 0.38), ("Washington DC", 0.30), ("Chicago", 0.20)],
     "Los Angeles": [("San Francisco", 0.50), ("San Diego", 0.40), ("Las Vegas", 0.25), ("Phoenix", 0.18)],
-    "London":      [("Manchester", 0.55), ("Birmingham", 0.42), ("Amsterdam", 0.35), ("Dublin", 0.28)],
-    "Berlin":      [("Warsaw", 0.52), ("Hamburg", 0.45), ("Vienna", 0.38), ("Prague", 0.32)],
-    "Moscow":      [("St. Petersburg", 0.60), ("Minsk", 0.42), ("Kyiv", 0.30), ("Kazan", 0.25)],
-    "Beijing":     [("Shanghai", 0.65), ("Tianjin", 0.55), ("Chengdu", 0.35), ("Wuhan", 0.28)],
-    "Tokyo":       [("Osaka", 0.62), ("Nagoya", 0.50), ("Seoul", 0.28), ("Fukuoka", 0.22)],
-    "Delhi":       [("Mumbai", 0.55), ("Kolkata", 0.42), ("Bangalore", 0.38), ("Hyderabad", 0.30)],
-    "Sao Paulo":   [("Rio de Janeiro", 0.60), ("Brasilia", 0.35), ("Buenos Aires", 0.22), ("Lima", 0.18)],
-    "Cairo":       [("Alexandria", 0.65), ("Amman", 0.30), ("Riyadh", 0.22), ("Beirut", 0.18)],
-    "Nairobi":     [("Mombasa", 0.55), ("Addis Ababa", 0.32), ("Dar es Salaam", 0.28), ("Kampala", 0.20)],
-    "Tehran":      [("Isfahan", 0.60), ("Baghdad", 0.25), ("Kabul", 0.20), ("Ankara", 0.18)],
-    "Jakarta":     [("Surabaya", 0.62), ("Bandung", 0.55), ("Kuala Lumpur", 0.30), ("Singapore", 0.25)],
+    "London": [("Manchester", 0.55), ("Birmingham", 0.42), ("Amsterdam", 0.35), ("Dublin", 0.28)],
+    "Berlin": [("Warsaw", 0.52), ("Hamburg", 0.45), ("Vienna", 0.38), ("Prague", 0.32)],
+    "Moscow": [("St. Petersburg", 0.60), ("Minsk", 0.42), ("Kyiv", 0.30), ("Kazan", 0.25)],
+    "Beijing": [("Shanghai", 0.65), ("Tianjin", 0.55), ("Chengdu", 0.35), ("Wuhan", 0.28)],
+    "Tokyo": [("Osaka", 0.62), ("Nagoya", 0.50), ("Seoul", 0.28), ("Fukuoka", 0.22)],
+    "Delhi": [("Mumbai", 0.55), ("Kolkata", 0.42), ("Bangalore", 0.38), ("Hyderabad", 0.30)],
+    "Sao Paulo": [("Rio de Janeiro", 0.60), ("Brasilia", 0.35), ("Buenos Aires", 0.22), ("Lima", 0.18)],
+    "Cairo": [("Alexandria", 0.65), ("Amman", 0.30), ("Riyadh", 0.22), ("Beirut", 0.18)],
+    "Nairobi": [("Mombasa", 0.55), ("Addis Ababa", 0.32), ("Dar es Salaam", 0.28), ("Kampala", 0.20)],
+    "Tehran": [("Isfahan", 0.60), ("Baghdad", 0.25), ("Kabul", 0.20), ("Ankara", 0.18)],
+    "Jakarta": [("Surabaya", 0.62), ("Bandung", 0.55), ("Kuala Lumpur", 0.30), ("Singapore", 0.25)],
 }
 
 
@@ -555,23 +555,8 @@ async def heatmap_stream(websocket: WebSocket):
 async def simulate_spread(body: SimulateRequest):
     """
     Run a velocity-diffusion spread simulation for a single hotspot.
-
-    Uses the hotspot's intelligence-scored reality_score and virality_score
-    to project how many events will surface in neighbouring cities over the
-    requested time horizon.
-
-    Request body:
-      hotspot_label       — label of the origin hotspot (must match a seed event)
-      category            — used to synthesise an event when label is unknown
-      time_horizon_hours  — projection window (default 48 h)
-
-    Response:
-      confidence          — simulation confidence (0–1), inversely proportional
-                            to reality_score (more destabilised = higher certainty)
-      model               — model identifier string
-      projected_spread    — list of { city, projectedCount } sorted by impact desc
     """
-    # Resolve origin event from seed data; synthesise if not found
+    # Resolve origin event from seed data; synthesize if not found.
     event = next((e for e in _EVENTS if e.label == body.hotspot_label), None)
     if event is None:
         event = HeatmapEvent(
@@ -583,17 +568,17 @@ async def simulate_spread(body: SimulateRequest):
 
     scored = assess_event(event)
 
-    # Simulation confidence: higher risk → more certain the misinfo will spread
+    # Higher risk -> more certainty the narrative spreads.
     sim_confidence = round(
         max(0.40, min(0.95, 1.0 - (scored.reality_score or 50) / 100 * 0.55)),
         2,
     )
 
-    virality       = event.virality_score or 1.0
+    virality = event.virality_score or 1.0
     horizon_factor = body.time_horizon_hours / 48.0
 
     neighbours = _SPREAD_NEIGHBOURS.get(event.label, [("Adjacent Region", 0.30)])
-    projected  = [
+    projected = [
         SpreadCity(
             city=city,
             projectedCount=max(10, int(event.count * virality * factor * horizon_factor)),

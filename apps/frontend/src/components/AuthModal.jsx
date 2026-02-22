@@ -79,16 +79,8 @@ export default function AuthModal({ mode: initialMode = 'login', onSuccess, onCl
         </button>
 
         {/* Logo */}
-        <div className="flex items-center gap-2.5 mb-7">
-          <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-            style={{ background: 'linear-gradient(135deg, #059669, #10b981)' }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            </svg>
-          </div>
-          <span className="text-white font-bold text-lg">TruthGuard</span>
+        <div className="mb-7">
+          <span className="text-white font-bold text-2xl tracking-tight">Veryfi</span>
         </div>
 
         {/* Mode tabs */}
@@ -104,7 +96,7 @@ export default function AuthModal({ mode: initialMode = 'login', onSuccess, onCl
               className="flex-1 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 focus:outline-none"
               style={
                 mode === m
-                  ? { background: 'rgba(16,185,129,0.12)', color: '#34d399', border: '1px solid rgba(16,185,129,0.25)' }
+                  ? { background: 'rgba(239,68,68,0.12)', color: '#f87171', border: '1px solid rgba(239,68,68,0.25)' }
                   : { background: 'transparent', color: '#475569', border: '1px solid transparent' }
               }
             >
@@ -191,7 +183,7 @@ export default function AuthModal({ mode: initialMode = 'login', onSuccess, onCl
           <button
             type="button"
             onClick={() => switchMode(isRegister ? 'login' : 'register')}
-            className="text-emerald-500 hover:text-emerald-400 transition-colors font-medium"
+            className="text-red-500 hover:text-red-400 transition-colors font-medium"
           >
             {isRegister ? 'Sign in' : 'Create one'}
           </button>
