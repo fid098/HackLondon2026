@@ -519,95 +519,125 @@ export default function Popup() {
         minHeight: 320,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke={C.brand}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-        </svg>
-        <span style={{ fontSize: 17, fontWeight: 700, color: C.brand }}>TruthGuard</span>
-
-        <button
-          onClick={() => void toggleEnabled()}
-          title={settings.enabled ? 'Disable scanning' : 'Enable scanning'}
-          style={{
-            marginLeft: 'auto',
-            width: 56,
-            height: 24,
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: 12,
-            fontSize: 11,
-            fontWeight: 700,
-            background: settings.enabled ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.12)',
-            color: settings.enabled ? C.green : C.red,
-            border: `1px solid ${settings.enabled ? 'rgba(16,185,129,0.35)' : 'rgba(239,68,68,0.3)'}`,
-            cursor: 'pointer',
-          }}
-        >
-          {settings.enabled ? 'ON' : 'OFF'}
-        </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        <span style={{ fontSize: 17, fontWeight: 700, color: C.brand }}>Veryfi</span>
       </div>
 
-      <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Misinformation and Deepfake Detection</div>
+      <div style={{ display: 'grid', gap: 8, marginBottom: 10 }}>
+        <div style={{ fontSize: 11, color: C.muted, lineHeight: 1.35 }}>Misinformation and Deepfake Detection</div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-        <span style={{ fontSize: 11, color: C.muted }}>Background protection (Red-Flag)</span>
-        <button
-          onClick={() => void toggleRedFlag()}
-          disabled={!settings.enabled}
-          title={settings.redFlagEnabled ? 'Disable deepfake video scanning' : 'Enable deepfake video scanning'}
-          style={{
-            width: 56,
-            height: 24,
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: 12,
-            fontSize: 11,
-            fontWeight: 700,
-            background: settings.redFlagEnabled ? 'rgba(245,158,11,0.15)' : 'rgba(100,116,139,0.15)',
-            color: settings.redFlagEnabled ? C.amber : C.muted,
-            border: `1px solid ${settings.redFlagEnabled ? 'rgba(245,158,11,0.4)' : 'rgba(100,116,139,0.3)'}`,
-            cursor: settings.enabled ? 'pointer' : 'not-allowed',
-            opacity: settings.enabled ? 1 : 0.45,
-          }}
-        >
-          {settings.redFlagEnabled ? 'ON' : 'OFF'}
-        </button>
-      </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
+          <div
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 6,
+              padding: '7px 4px',
+              borderRadius: 8,
+              background: 'rgba(255,255,255,0.03)',
+              border: `1px solid ${C.border}`,
+            }}
+          >
+            <span style={{ fontSize: 10, color: C.muted, lineHeight: 1.2, textAlign: 'center' }}>Scanner</span>
+            <button
+              onClick={() => void toggleEnabled()}
+              title={settings.enabled ? 'Disable scanning' : 'Enable scanning'}
+              style={{
+                width: 56,
+                height: 24,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 12,
+                fontSize: 11,
+                fontWeight: 700,
+                background: settings.enabled ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.12)',
+                color: settings.enabled ? C.green : C.red,
+                border: `1px solid ${settings.enabled ? 'rgba(16,185,129,0.35)' : 'rgba(239,68,68,0.3)'}`,
+                cursor: 'pointer',
+              }}
+            >
+              {settings.enabled ? 'ON' : 'OFF'}
+            </button>
+          </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-        <span style={{ fontSize: 11, color: C.muted }}>Meeting mode (Meet / Zoom)</span>
-        <button
-          onClick={() => void toggleMeetingMode()}
-          disabled={!settings.enabled || meetingBusy}
-          style={{
-            width: 56,
-            height: 24,
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: 12,
-            fontSize: 11,
-            fontWeight: 700,
-            background: settings.meetingModeEnabled ? 'rgba(99,102,241,0.2)' : 'rgba(100,116,139,0.15)',
-            color: settings.meetingModeEnabled ? '#818cf8' : C.muted,
-            border: `1px solid ${settings.meetingModeEnabled ? 'rgba(99,102,241,0.4)' : 'rgba(100,116,139,0.3)'}`,
-            cursor: meetingBusy ? 'wait' : settings.enabled ? 'pointer' : 'not-allowed',
-            opacity: settings.enabled && !meetingBusy ? 1 : 0.45,
-          }}
-        >
-          {settings.meetingModeEnabled ? 'ON' : 'OFF'}
-        </button>
+          <div
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 6,
+              padding: '7px 4px',
+              borderRadius: 8,
+              background: 'rgba(255,255,255,0.03)',
+              border: `1px solid ${C.border}`,
+            }}
+          >
+            <span style={{ fontSize: 10, color: C.muted, lineHeight: 1.2, textAlign: 'center' }}>Background</span>
+            <button
+              onClick={() => void toggleRedFlag()}
+              disabled={!settings.enabled}
+              title={settings.redFlagEnabled ? 'Disable deepfake video scanning' : 'Enable deepfake video scanning'}
+              style={{
+                width: 56,
+                height: 24,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 12,
+                fontSize: 11,
+                fontWeight: 700,
+                background: settings.redFlagEnabled ? 'rgba(245,158,11,0.15)' : 'rgba(100,116,139,0.15)',
+                color: settings.redFlagEnabled ? C.amber : C.muted,
+                border: `1px solid ${settings.redFlagEnabled ? 'rgba(245,158,11,0.4)' : 'rgba(100,116,139,0.3)'}`,
+                cursor: settings.enabled ? 'pointer' : 'not-allowed',
+                opacity: settings.enabled ? 1 : 0.45,
+              }}
+            >
+              {settings.redFlagEnabled ? 'ON' : 'OFF'}
+            </button>
+          </div>
+
+          <div
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 6,
+              padding: '7px 4px',
+              borderRadius: 8,
+              background: 'rgba(255,255,255,0.03)',
+              border: `1px solid ${C.border}`,
+            }}
+          >
+            <span style={{ fontSize: 10, color: C.muted, lineHeight: 1.2, textAlign: 'center' }}>Meeting mode</span>
+            <button
+              onClick={() => void toggleMeetingMode()}
+              disabled={!settings.enabled || meetingBusy}
+              style={{
+                width: 56,
+                height: 24,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 12,
+                fontSize: 11,
+                fontWeight: 700,
+                background: settings.meetingModeEnabled ? 'rgba(99,102,241,0.2)' : 'rgba(100,116,139,0.15)',
+                color: settings.meetingModeEnabled ? '#818cf8' : C.muted,
+                border: `1px solid ${settings.meetingModeEnabled ? 'rgba(99,102,241,0.4)' : 'rgba(100,116,139,0.3)'}`,
+                cursor: meetingBusy ? 'wait' : settings.enabled ? 'pointer' : 'not-allowed',
+                opacity: settings.enabled && !meetingBusy ? 1 : 0.45,
+              }}
+            >
+              {settings.meetingModeEnabled ? 'ON' : 'OFF'}
+            </button>
+          </div>
+        </div>
       </div>
 
       <div
@@ -815,7 +845,7 @@ export default function Popup() {
         </p>
         <button
           onClick={() => chrome.tabs.create({ url: 'http://localhost:5173' })}
-          title="Open TruthGuard dashboard"
+          title="Open Veryfi dashboard"
           style={{
             marginLeft: 10,
             flexShrink: 0,

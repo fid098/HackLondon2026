@@ -120,7 +120,7 @@ chrome.runtime.onInstalled.addListener((details) => {
   // contexts: ['selection'] means it only appears when the user has text selected.
   chrome.contextMenus.create({
     id:       'tg-analyze-selection',
-    title:    'Analyze with TruthGuard',
+    title:    'Analyze with Veryfi',
     contexts: ['selection'],
   })
 
@@ -240,7 +240,7 @@ async function analyzeViaAPI(text: string): Promise<TriageResult> {
   const settings = await getSettings()
 
   if (!settings.enabled) {
-    return { verdict: 'UNVERIFIED', confidence: 0, summary: 'TruthGuard is disabled.' }
+    return { verdict: 'UNVERIFIED', confidence: 0, summary: 'Veryfi is disabled.' }
   }
 
   const res = await fetch(`${settings.apiBase}/api/v1/triage`, {
