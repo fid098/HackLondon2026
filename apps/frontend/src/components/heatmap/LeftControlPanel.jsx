@@ -74,11 +74,15 @@ export default function LeftControlPanel({
   vizMode, userLocation, enableLocation, locationError,
 }) {
   const { agentLogs } = useAgentLogs()
-  const logsEndRef = useRef(null)
+  const logsContainerRef = useRef(null)
 
-  // Auto-scroll agent log to newest entry
+  // Auto-scroll ONLY the inner log box to the newest entry.
+  // Using scrollTop directly (instead of scrollIntoView) prevents the effect
+  // from propagating to the outer sidebar, so the user can scroll the panel
+  // freely after page load.
   useEffect(() => {
-    logsEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const el = logsContainerRef.current
+    if (el) el.scrollTop = el.scrollHeight
   }, [agentLogs])
 
   return (
@@ -277,7 +281,7 @@ export default function LeftControlPanel({
             LIVE
           </span>
         </div>
-        <div style={{ maxHeight: 160, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <div ref={logsContainerRef} style={{ maxHeight: 160, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>
           {agentLogs.map(log => (
             <div key={log.id} style={{
               display: 'flex', gap: 5, alignItems: 'flex-start',
@@ -301,7 +305,6 @@ export default function LeftControlPanel({
               </div>
             </div>
           ))}
-          <div ref={logsEndRef} />
         </div>
       </div>
 

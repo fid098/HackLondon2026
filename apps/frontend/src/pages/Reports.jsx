@@ -11,7 +11,7 @@
  */
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { getReports } from '../lib/api'
+import { downloadReport, getReports } from '../lib/api'
 
 /* ─── verdict config ─────────────────────────────────────────────────────── */
 
@@ -200,11 +200,17 @@ function ReportCard({ report, onNavigate }) {
           <div className="flex flex-wrap gap-3">
             <button
               className="text-xs btn-secondary px-4 py-2"
-              onClick={(e) => { e.stopPropagation(); onNavigate('factcheck') }}
+              onClick={(e) => { e.stopPropagation(); onNavigate('analyze') }}
             >
               Re-analyse
             </button>
-            <button className="text-xs text-slate-600 hover:text-slate-400 transition-colors px-2">
+            <button
+              className="text-xs text-slate-600 hover:text-slate-400 transition-colors px-2"
+              onClick={async (e) => {
+                e.stopPropagation()
+                try { await downloadReport(report.id) } catch (_) {}
+              }}
+            >
               Export JSON ↓
             </button>
           </div>
@@ -311,7 +317,7 @@ export default function Reports({ onNavigate }) {
         </div>
         <h1 className="text-4xl font-extrabold text-white mb-2">Report Archive</h1>
         <p className="text-slate-500">
-          Every analysis is saved to MongoDB Atlas. Search, filter, and re-open any previous report.
+          Reports you save from the Analyse page are stored in MongoDB Atlas. Search, filter, and re-open any previous analysis.
         </p>
       </div>
 
