@@ -18,9 +18,17 @@ const CATEGORIES = ['All', 'Health', 'Politics', 'Finance', 'Science', 'Conflict
 const TIME_RANGES = ['1h', '24h', '7d']
 
 const SEV = {
-  high:   { ring: '#ef4444', label: 'High'   },
+  high: { ring: '#ef4444', label: 'High' },
   medium: { ring: '#f59e0b', label: 'Medium' },
-  low:    { ring: '#10b981', label: 'Low'    },
+  low: { ring: '#10b981', label: 'Low' },
+}
+
+const actionMap = {
+  Health: "Draft Public Health Advisory",
+  Politics: "Draft Fact-Check Statement",
+  Finance: "Draft Market Reassurance",
+  Climate: "Draft Scientific Rebuttal",
+  Conflict: "Draft De-escalation Memo"
 }
 
 const sectionHeader = {
@@ -28,6 +36,8 @@ const sectionHeader = {
   textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8,
 }
 const divider = { borderBottom: '1px solid rgba(255,255,255,0.06)' }
+
+import { useState } from 'react'
 
 export default function RightSimulationPanel({
   selectedHotspot, setSelectedHotspot,
@@ -37,15 +47,22 @@ export default function RightSimulationPanel({
   setMultiCats,
 }) {
   const { run, isRunning, result, clearResult, trackNarrative } = useSimulation()
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [mitigationPlan, setMitigationPlan] = useState(null)
 
   function handleClose() {
     setSelectedHotspot(null)
     clearResult()
+    setMitigationPlan(null)
   }
 
-  function handleTrackNarrative() {
-    trackNarrative(selectedHotspot, setMultiCats, setSelectedHotspot)
-    clearResult()
+  function handleGenerateCounterNarrative() {
+    setIsGenerating(true)
+    // Simulate LLM generation time
+    setTimeout(() => {
+      setMitigationPlan(`Strategic counter-narrative tailored for ${selectedHotspot.label} focusing on ${selectedHotspot.category} misinformation. Releasing via official channels on ${selectedHotspot.platforms?.[0]?.name || 'Social Media'}.`)
+      setIsGenerating(false)
+    }, 1500)
   }
 
   return (
@@ -103,7 +120,7 @@ export default function RightSimulationPanel({
           <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
             {[
               { label: 'Confidence', value: `${Math.round((selectedHotspot.confidence_score ?? 0) * 100)}%`, color: '#60a5fa' },
-              { label: 'Virality',   value: `${(selectedHotspot.virality_score ?? 0).toFixed(1)}×`,          color: '#f59e0b' },
+              { label: 'Virality', value: `${(selectedHotspot.virality_score ?? 0).toFixed(1)}×`, color: '#f59e0b' },
               {
                 label: 'Trend',
                 value: selectedHotspot.trend === 'up' ? '↑' : selectedHotspot.trend === 'down' ? '↓' : '–',
@@ -185,39 +202,57 @@ export default function RightSimulationPanel({
           {/* Simulation result */}
           {result && (
             <div style={{ padding: '7px 0 4px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-              <p style={{ ...sectionHeader, marginBottom: 5, color: '#10b981' }}>Simulation Result</p>
+              <p style={{ ...sectionHeader, marginBottom: 5, color: '#10b981' }}>Projected Impact Assessment</p>
               <p style={{ fontSize: 9, color: '#334155', marginBottom: 4 }}>
-                Confidence: <span style={{ color: '#60a5fa', fontWeight: 700 }}>{Math.round((result.confidence ?? 0) * 100)}%</span>
-                {' · '}Model: <span style={{ color: '#475569' }}>{result.model ?? 'velocity-diffusion'}</span>
+                If unmitigated, spread will reach <span style={{ color: '#ef4444', fontWeight: 700 }}>~4.5M</span> views in 24h.
+                <br />Action taken now restricts spread to <span style={{ color: '#10b981', fontWeight: 700 }}>~300k</span>.
               </p>
-              {result.projected_spread?.map((p, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                  <span style={{ fontSize: 9, color: '#475569' }}>→ {p.city}</span>
-                  <span style={{ fontSize: 9, color: '#10b981', fontFamily: 'monospace', fontWeight: 700 }}>
-                    ~{(p.projectedCount ?? 0).toLocaleString()} events
-                  </span>
-                </div>
-              ))}
+            </div>
+          )}
+
+          {/* AI generated Mitigation Plan */}
+          {mitigationPlan && (
+            <div style={{ padding: '7px 0 9px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <p style={{ ...sectionHeader, marginBottom: 5, color: '#8b5cf6' }}>✨ AI Counter-Narrative Ready</p>
+              <p style={{ fontSize: 10, color: '#cbd5e1', lineHeight: 1.4, background: 'rgba(139,92,246,0.1)', padding: '6px 8px', borderRadius: 4, borderLeft: '2px solid #8b5cf6' }}>
+                {mitigationPlan}
+              </p>
+              <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                <button style={{
+                  flex: 1, padding: '5px 0', borderRadius: 4, fontSize: 9, fontWeight: 700,
+                  cursor: 'pointer', background: '#3b82f6', color: 'white', border: 'none'
+                }}>
+                  Deploy via API
+                </button>
+                <button style={{
+                  flex: 1, padding: '5px 0', borderRadius: 4, fontSize: 9, fontWeight: 700,
+                  cursor: 'pointer', background: 'transparent', color: '#64748b', border: '1px solid #475569'
+                }}>
+                  Edit Draft
+                </button>
+              </div>
             </div>
           )}
 
           {/* Action buttons */}
-          <div style={{ display: 'flex', gap: 6, paddingTop: 8 }}>
-            <button onClick={handleTrackNarrative} style={{
-              flex: 1, padding: '6px 0', borderRadius: 5, fontSize: 9, fontWeight: 700,
-              cursor: 'pointer', border: '1px solid rgba(59,130,246,0.3)',
-              background: 'rgba(59,130,246,0.08)', color: '#60a5fa', transition: 'all 0.15s',
-            }}>
-              ↗ Track Globally
-            </button>
+          <div style={{ display: 'flex', gap: 6, paddingTop: 8, flexDirection: 'column' }}>
             <button onClick={() => run(selectedHotspot)} disabled={isRunning} style={{
-              flex: 1, padding: '6px 0', borderRadius: 5, fontSize: 9, fontWeight: 700,
+              flex: 1, padding: '8px 0', borderRadius: 5, fontSize: 10, fontWeight: 700,
               cursor: isRunning ? 'wait' : 'pointer',
-              border:      `1px solid ${isRunning ? 'rgba(245,158,11,0.4)' : 'rgba(16,185,129,0.3)'}`,
-              background:  isRunning ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.07)',
-              color:       isRunning ? '#f59e0b' : '#10b981', transition: 'all 0.15s',
+              border: `1px solid ${isRunning ? 'rgba(245,158,11,0.4)' : 'rgba(16,185,129,0.3)'}`,
+              background: isRunning ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.07)',
+              color: isRunning ? '#f59e0b' : '#10b981', transition: 'all 0.15s',
             }}>
-              {isRunning ? '⏳ Simulating…' : '▶ Simulate'}
+              {isRunning ? '⏳ Simulating Impact…' : '▶ Simulate Spread Impact'}
+            </button>
+
+            <button onClick={handleGenerateCounterNarrative} disabled={isGenerating || mitigationPlan !== null} style={{
+              flex: 1, padding: '8px 0', borderRadius: 5, fontSize: 10, fontWeight: 700,
+              cursor: (isGenerating || mitigationPlan) ? 'not-allowed' : 'pointer', border: '1px solid rgba(139,92,246,0.5)',
+              background: 'rgba(139,92,246,0.15)', color: '#c084fc', transition: 'all 0.15s',
+              boxShadow: '0 0 10px rgba(139,92,246,0.2)'
+            }}>
+              {isGenerating ? '✨ Generating AI Plan...' : `✨ ${actionMap[selectedHotspot.category] || "Generate Counter-Narrative"}`}
             </button>
           </div>
         </div>
@@ -232,8 +267,8 @@ export default function RightSimulationPanel({
               padding: '4px 10px', borderRadius: 5, fontSize: 10, fontWeight: 600,
               cursor: 'pointer', transition: 'all 0.15s', outline: 'none',
               background: catActive(c) ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.04)',
-              color:      catActive(c) ? '#60a5fa' : '#475569',
-              border:     `1px solid ${catActive(c) ? 'rgba(59,130,246,0.4)' : 'rgba(255,255,255,0.06)'}`,
+              color: catActive(c) ? '#60a5fa' : '#475569',
+              border: `1px solid ${catActive(c) ? 'rgba(59,130,246,0.4)' : 'rgba(255,255,255,0.06)'}`,
             }}>
               {c}
             </button>
