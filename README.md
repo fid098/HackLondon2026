@@ -93,9 +93,9 @@ cd apps/frontend && npm run lint
 ```
 /
 ├── apps/
-│   ├── frontend/     # React web app  (Leena — UI/UX)
-│   ├── extension/    # Chrome Extension MV3  (Fidel)
-│   └── backend/      # FastAPI backend  (Ayo — Heatmap, Ishaan — Analysis)
+│   ├── frontend/     # React web app
+│   ├── extension/    # Chrome Extension MV3 
+│   └── backend/      # FastAPI backend
 ├── packages/
 │   └── shared/       # Shared TypeScript types
 ├── infra/
@@ -114,7 +114,7 @@ Each team member has a dedicated onboarding guide:
 |-----------|------|-------|
 | **Ayo** | Heatmap (live map, MongoDB geo, WebSocket) | [docs/developers/AYO.md](docs/developers/AYO.md) |
 | **Ishaan** | AI Analysis (fact-check, deepfake, scam) | [docs/developers/ISHAAN.md](docs/developers/ISHAAN.md) |
-| **Leena** | Landing page + UI/UX (styles, components) | [docs/developers/LEENA.md](docs/developers/LEENA.md) |
+| **Leena** | Landing page + UI/UX, MongoDB | [docs/developers/LEENA.md](docs/developers/LEENA.md) |
 | **Fidel** | Chrome Extension (content script, popup) | [docs/developers/FIDEL.md](docs/developers/FIDEL.md) |
 
 ## Deploy on Vultr
