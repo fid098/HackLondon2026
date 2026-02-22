@@ -52,24 +52,12 @@ const REGIONS = [
 ]
 
 /**
- * HOTSPOTS — enriched mock data.
+ * HOTSPOTS — enriched mock data with accurate lat/lng for correct globe placement.
  * API INTEGRATION: Replace with GET /api/v1/heatmap response.
- * MongoDB aggregation (apps/backend/app/routes/heatmap.py):
- *   db.reports.aggregate([
- *     { $match: { timestamp: { $gte: cutoff } } },
- *     { $group: {
- *         _id: { lat: {$round:["$geo.lat",1]}, lng: {$round:["$geo.lng",1]} },
- *         count: {$sum:1}, avgConfidence:{$avg:"$confidence_score"},
- *         avgVirality:{$avg:"$virality_score"}, topCategory:{$first:"$category"},
- *         topCity:{$first:"$geo.city"}, isCoordinated:{$max:{$cond:["$is_coordinated",1,0]}}
- *     }},
- *     { $addFields: { riskScore: {$multiply:["$avgConfidence","$avgVirality","$count"]} } },
- *     { $sort: { riskScore: -1 } }, { $limit: 100 }
- *   ])
  */
 const HOTSPOTS = [
   {
-    cx: 22, cy: 38, label: 'New York', count: 312, severity: 'high', category: 'Health',
+    lat: 40.7, lng: -74.0, label: 'New York', count: 312, severity: 'high', category: 'Health',
     confidence_score: 0.87, virality_score: 1.4, trend: 'up',
     platforms: [{ name: 'Twitter/X', pct: 45 }, { name: 'Facebook', pct: 30 }, { name: 'Telegram', pct: 25 }],
     topClaims: ['Vaccine microchip conspiracy resurfaces', 'Hospital overflow claims spreading'],
@@ -77,7 +65,7 @@ const HOTSPOTS = [
     isCoordinated: true, isSpikeAnomaly: false,
   },
   {
-    cx: 16, cy: 43, label: 'Los Angeles', count: 198, severity: 'medium', category: 'Politics',
+    lat: 34.1, lng: -118.2, label: 'Los Angeles', count: 198, severity: 'medium', category: 'Politics',
     confidence_score: 0.74, virality_score: 1.1, trend: 'up',
     platforms: [{ name: 'Twitter/X', pct: 55 }, { name: 'Reddit', pct: 30 }, { name: 'TikTok', pct: 15 }],
     topClaims: ['AI-generated election footage shared', 'Voter fraud claims resurface'],
@@ -85,7 +73,7 @@ const HOTSPOTS = [
     isCoordinated: false, isSpikeAnomaly: false,
   },
   {
-    cx: 47, cy: 32, label: 'London', count: 245, severity: 'high', category: 'Health',
+    lat: 51.5, lng: -0.1, label: 'London', count: 245, severity: 'high', category: 'Health',
     confidence_score: 0.91, virality_score: 1.6, trend: 'up',
     platforms: [{ name: 'Twitter/X', pct: 40 }, { name: 'WhatsApp', pct: 35 }, { name: 'Facebook', pct: 25 }],
     topClaims: ['NHS collapse false reports', '5G health conspiracy gaining traction'],
@@ -93,7 +81,7 @@ const HOTSPOTS = [
     isCoordinated: true, isSpikeAnomaly: true,
   },
   {
-    cx: 49, cy: 30, label: 'Berlin', count: 134, severity: 'medium', category: 'Climate',
+    lat: 52.5, lng: 13.4, label: 'Berlin', count: 134, severity: 'medium', category: 'Climate',
     confidence_score: 0.68, virality_score: 0.9, trend: 'same',
     platforms: [{ name: 'Twitter/X', pct: 35 }, { name: 'Telegram', pct: 40 }, { name: 'YouTube', pct: 25 }],
     topClaims: ['Manipulated climate data graph circulating', 'Fake IPCC report screenshots'],
@@ -101,7 +89,7 @@ const HOTSPOTS = [
     isCoordinated: false, isSpikeAnomaly: false,
   },
   {
-    cx: 53, cy: 33, label: 'Moscow', count: 389, severity: 'high', category: 'Politics',
+    lat: 55.7, lng: 37.6, label: 'Moscow', count: 389, severity: 'high', category: 'Politics',
     confidence_score: 0.94, virality_score: 2.1, trend: 'up',
     platforms: [{ name: 'Telegram', pct: 60 }, { name: 'VKontakte', pct: 25 }, { name: 'Twitter/X', pct: 15 }],
     topClaims: ['State-linked narrative amplification', 'Conflict zone footage misattributed'],
@@ -109,7 +97,7 @@ const HOTSPOTS = [
     isCoordinated: true, isSpikeAnomaly: true,
   },
   {
-    cx: 72, cy: 38, label: 'Beijing', count: 521, severity: 'high', category: 'Science',
+    lat: 39.9, lng: 116.4, label: 'Beijing', count: 521, severity: 'high', category: 'Science',
     confidence_score: 0.82, virality_score: 1.8, trend: 'up',
     platforms: [{ name: 'WeChat', pct: 50 }, { name: 'Weibo', pct: 35 }, { name: 'Twitter/X', pct: 15 }],
     topClaims: ['Lab origin claims resurface', 'Fabricated research paper spreads'],
@@ -117,7 +105,7 @@ const HOTSPOTS = [
     isCoordinated: true, isSpikeAnomaly: false,
   },
   {
-    cx: 76, cy: 44, label: 'Tokyo', count: 287, severity: 'medium', category: 'Finance',
+    lat: 35.7, lng: 139.7, label: 'Tokyo', count: 287, severity: 'medium', category: 'Finance',
     confidence_score: 0.71, virality_score: 1.2, trend: 'down',
     platforms: [{ name: 'Twitter/X', pct: 50 }, { name: 'LINE', pct: 30 }, { name: 'Reddit', pct: 20 }],
     topClaims: ['False banking collapse rumour', 'Yen manipulation conspiracy'],
@@ -125,7 +113,7 @@ const HOTSPOTS = [
     isCoordinated: false, isSpikeAnomaly: false,
   },
   {
-    cx: 70, cy: 50, label: 'Delhi', count: 403, severity: 'high', category: 'Health',
+    lat: 28.6, lng: 77.2, label: 'Delhi', count: 403, severity: 'high', category: 'Health',
     confidence_score: 0.85, virality_score: 1.5, trend: 'up',
     platforms: [{ name: 'WhatsApp', pct: 55 }, { name: 'Facebook', pct: 30 }, { name: 'Twitter/X', pct: 15 }],
     topClaims: ['"Miracle cure" claims via WhatsApp', 'Hospital queue footage misused'],
@@ -133,7 +121,7 @@ const HOTSPOTS = [
     isCoordinated: false, isSpikeAnomaly: true,
   },
   {
-    cx: 28, cy: 60, label: 'São Paulo', count: 176, severity: 'medium', category: 'Politics',
+    lat: -23.5, lng: -46.6, label: 'São Paulo', count: 176, severity: 'medium', category: 'Politics',
     confidence_score: 0.72, virality_score: 1.0, trend: 'same',
     platforms: [{ name: 'WhatsApp', pct: 60 }, { name: 'Facebook', pct: 25 }, { name: 'Twitter/X', pct: 15 }],
     topClaims: ['Election fraud claims re-circulating', 'Deepfake political speech spreading'],
@@ -141,7 +129,7 @@ const HOTSPOTS = [
     isCoordinated: false, isSpikeAnomaly: false,
   },
   {
-    cx: 50, cy: 55, label: 'Cairo', count: 218, severity: 'medium', category: 'Conflict',
+    lat: 30.1, lng: 31.2, label: 'Cairo', count: 218, severity: 'medium', category: 'Conflict',
     confidence_score: 0.78, virality_score: 1.3, trend: 'up',
     platforms: [{ name: 'Facebook', pct: 45 }, { name: 'Twitter/X', pct: 30 }, { name: 'YouTube', pct: 25 }],
     topClaims: ['Conflict footage misattributed', 'Civilian casualty numbers inflated'],
@@ -149,7 +137,7 @@ const HOTSPOTS = [
     isCoordinated: false, isSpikeAnomaly: false,
   },
   {
-    cx: 54, cy: 62, label: 'Nairobi', count: 92, severity: 'low', category: 'Health',
+    lat: -1.3, lng: 36.8, label: 'Nairobi', count: 92, severity: 'low', category: 'Health',
     confidence_score: 0.61, virality_score: 0.7, trend: 'down',
     platforms: [{ name: 'WhatsApp', pct: 65 }, { name: 'Facebook', pct: 25 }, { name: 'Twitter/X', pct: 10 }],
     topClaims: ['Unverified herbal cure claims', 'Epidemic severity overstated'],
@@ -157,7 +145,7 @@ const HOTSPOTS = [
     isCoordinated: false, isSpikeAnomaly: false,
   },
   {
-    cx: 55, cy: 43, label: 'Tehran', count: 267, severity: 'high', category: 'Conflict',
+    lat: 35.7, lng: 51.4, label: 'Tehran', count: 267, severity: 'high', category: 'Conflict',
     confidence_score: 0.89, virality_score: 1.7, trend: 'up',
     platforms: [{ name: 'Telegram', pct: 55 }, { name: 'Instagram', pct: 30 }, { name: 'Twitter/X', pct: 15 }],
     topClaims: ['State-backed disinformation campaign', 'Protest footage misrepresented'],
@@ -165,12 +153,28 @@ const HOTSPOTS = [
     isCoordinated: true, isSpikeAnomaly: false,
   },
   {
-    cx: 79, cy: 67, label: 'Jakarta', count: 145, severity: 'medium', category: 'Health',
+    lat: -6.2, lng: 106.8, label: 'Jakarta', count: 145, severity: 'medium', category: 'Health',
     confidence_score: 0.69, virality_score: 1.1, trend: 'same',
     platforms: [{ name: 'WhatsApp', pct: 50 }, { name: 'Twitter/X', pct: 30 }, { name: 'TikTok', pct: 20 }],
     topClaims: ['Supplement claims trending', 'Dengue statistics manipulated'],
     timeData: { '1h': 12, '24h': 145, '7d': 730 },
     isCoordinated: false, isSpikeAnomaly: false,
+  },
+  {
+    lat: -33.9, lng: 151.2, label: 'Sydney', count: 118, severity: 'low', category: 'Climate',
+    confidence_score: 0.65, virality_score: 0.8, trend: 'up',
+    platforms: [{ name: 'Twitter/X', pct: 45 }, { name: 'Facebook', pct: 35 }, { name: 'Reddit', pct: 20 }],
+    topClaims: ['Wildfire scale misrepresented', 'Climate policy misinformation spreading'],
+    timeData: { '1h': 8, '24h': 118, '7d': 560 },
+    isCoordinated: false, isSpikeAnomaly: false,
+  },
+  {
+    lat: 6.5, lng: 3.4, label: 'Lagos', count: 156, severity: 'medium', category: 'Finance',
+    confidence_score: 0.73, virality_score: 1.2, trend: 'up',
+    platforms: [{ name: 'WhatsApp', pct: 55 }, { name: 'Facebook', pct: 30 }, { name: 'Twitter/X', pct: 15 }],
+    topClaims: ['Crypto scam narratives spreading', 'Banking system collapse rumours'],
+    timeData: { '1h': 15, '24h': 156, '7d': 780 },
+    isCoordinated: false, isSpikeAnomaly: true,
   },
 ]
 
@@ -224,22 +228,6 @@ const INITIAL_FEED_HISTORY = [
   { id: 10, time: '05:17:12', msg: 'Agent verdict: FALSE',                  city: 'São Paulo', category: 'Politics', sev: 'medium' },
 ]
 
-/**
- * SCATTER_PARTICLES — ambient orbital dots rendered around the globe (aesthetic layer).
- * Computed once at module load so positions/sizes are stable across re-renders.
- * In the reference image these resemble satellite debris clouds / signal nodes.
- * Varying altitudes (0.05 – 0.65) place them from near-surface up to high orbit.
- */
-const SCATTER_PARTICLES = (() => {
-  const rng = (mn, mx) => mn + Math.random() * (mx - mn)
-  return Array.from({ length: 420 }, () => ({
-    lat:      rng(-80, 80),
-    lng:      rng(-180, 180),
-    altitude: rng(0.05, 0.65),
-    size:     rng(0.03, 0.11),
-    _type:    'particle',
-  }))
-})()
 
 const SEV = {
   high:   { ring: '#ef4444', label: 'High',   text: '#ef4444' },
@@ -247,42 +235,9 @@ const SEV = {
   low:    { ring: '#10b981', label: 'Low',    text: '#10b981' },
 }
 
-const POLITICAL_COLORS = [
-  'rgba(235,200,160,0.65)', 'rgba(175,210,180,0.65)', 'rgba(190,215,245,0.65)',
-  'rgba(245,235,170,0.65)', 'rgba(215,195,235,0.65)', 'rgba(240,195,190,0.65)',
-  'rgba(180,225,225,0.65)', 'rgba(225,245,195,0.65)',
-]
-
 const TIME_RANGES = ['1h', '24h', '7d']
-const VIEW_MODES  = ['Global', 'Country', 'City']
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
-
-function getCountryColor(feat) {
-  const name = feat.properties?.ADMIN || ''
-  let h = 0
-  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h)
-  return POLITICAL_COLORS[Math.abs(h) % POLITICAL_COLORS.length]
-}
-
-function computeCentroid(feature) {
-  try {
-    const geom = feature.geometry
-    if (!geom) return null
-    let ring
-    if (geom.type === 'Polygon') {
-      ring = geom.coordinates[0]
-    } else if (geom.type === 'MultiPolygon') {
-      ring = geom.coordinates.reduce(
-        (best, poly) => (poly[0].length > best.length ? poly[0] : best),
-        geom.coordinates[0][0],
-      )
-    } else return null
-    const lats = ring.map(c => c[1])
-    const lngs = ring.map(c => c[0])
-    return { lat: (Math.min(...lats) + Math.max(...lats)) / 2, lng: (Math.min(...lngs) + Math.max(...lngs)) / 2 }
-  } catch { return null }
-}
 
 /**
  * getDisplayCount — Feature 4: Confidence Mode.
@@ -325,8 +280,10 @@ export default function Heatmap() {
   const [timeRange, setTimeRange] = useState('24h')
   const [isPlaying, setIsPlaying] = useState(false)
 
-  /* ── Feature 1: View mode ── */
-  const [viewMode, setViewMode] = useState('Global')
+  /* ── Location search ── */
+  const [locationQuery,    setLocationQuery]    = useState('')
+  const [locationSearching, setLocationSearching] = useState(false)
+  const [searchedLocation,  setSearchedLocation]  = useState(null) // { lat, lng, name }
 
   /* ── Feature 4: Viz mode ── */
   const [vizMode, setVizMode] = useState('volume')
@@ -336,9 +293,6 @@ export default function Heatmap() {
 
   /* ── Feature 5: Hotspot Detection Panel ── */
   const [selectedHotspot, setSelectedHotspot] = useState(null)
-
-  /* ── Feature 6: Narrative arcs toggle ── */
-  const [showArcs, setShowArcs] = useState(true)
 
   /* ── Feature 11: Simulation ── */
   const [simulationRunning, setSimulationRunning] = useState(false)
@@ -481,14 +435,25 @@ export default function Heatmap() {
     )
   }, [])
 
-  /* ── Feature 1: View mode → camera altitude ── */
-  const applyViewMode = useCallback((mode) => {
-    setViewMode(mode)
-    if (!globeRef.current) return
-    const altMap = { Global: 2.0, Country: 1.5, City: 1.0 }
-    const cur = globeRef.current.pointOfView()
-    globeRef.current.pointOfView({ ...cur, altitude: altMap[mode] }, 800)
-  }, [])
+  /* ── Location search — geocodes a place name and flies the globe to it ── */
+  const searchLocation = useCallback(async (query) => {
+    const q = (query ?? locationQuery).trim()
+    if (!q || !globeRef.current) return
+    setLocationSearching(true)
+    try {
+      const res  = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`)
+      const data = await res.json()
+      if (data.length > 0) {
+        const { lat, lon, display_name } = data[0]
+        const parsedLat = parseFloat(lat)
+        const parsedLng = parseFloat(lon)
+        setSearchedLocation({ lat: parsedLat, lng: parsedLng, name: display_name.split(',')[0] })
+        globeRef.current.pointOfView({ lat: parsedLat, lng: parsedLng, altitude: 1.2 }, 1000)
+      }
+    } catch (_) { /* ignore network errors */ } finally {
+      setLocationSearching(false)
+    }
+  }, [locationQuery])
 
   /* ── Feature 3: Multi-select ── */
   const toggleCat = useCallback((c) => {
@@ -566,61 +531,22 @@ export default function Heatmap() {
       .filter(h => multiCats.size === 0 || multiCats.has(h.category))
       .map(spot => ({
         ...spot,
-        lat: 90 - (spot.cy / 100) * 180,
-        lng: (spot.cx / 100) * 360 - 180,
         displayCount: getDisplayCount(spot, vizMode, timeRange),
       })),
     [hotspots, multiCats, vizMode, timeRange],
   )
 
-  /**
-   * narrativeArcs — Feature 6: Narrative Spread Arcs.
-   * Client-side: connects highest-count hotspot to up to 2 others in same category.
-   * API INTEGRATION: replace with getHeatmapArcs({ hours }) from GET /api/v1/heatmap/arcs
-   * MongoDB aggregation groups by narrative_id, finds co-occurring geolocations.
-   */
-  const narrativeArcs = useMemo(() => {
-    if (!showArcs || globeSpots.length < 2) return []
-    const byCat = {}
-    for (const s of globeSpots) {
-      if (!byCat[s.category]) byCat[s.category] = []
-      byCat[s.category].push(s)
-    }
-    const arcs = []
-    for (const group of Object.values(byCat)) {
-      if (group.length < 2) continue
-      const sorted = [...group].sort((a, b) => b.displayCount - a.displayCount)
-      const maxConns = Math.min(sorted.length - 1, 2)
-      for (let i = 0; i < maxConns; i++) {
-        arcs.push({
-          startLat: sorted[0].lat, startLng: sorted[0].lng,
-          endLat:   sorted[i + 1].lat, endLng: sorted[i + 1].lng,
-          color:    SEV[sorted[0].severity].ring,
-          category: sorted[0].category,
-          label:    `${sorted[0].label} → ${sorted[i + 1].label}`,
-        })
-      }
-    }
-    return arcs
-  }, [globeSpots, showArcs])
-
-  const countryLabels = useMemo(() =>
-    countries.features.flatMap(feat => {
-      const c    = computeCentroid(feat)
-      const name = feat.properties?.ADMIN || ''
-      return c && name ? [{ lat: c.lat, lng: c.lng, name }] : []
-    }),
-    [countries],
-  )
 
   const filteredNarratives = useMemo(() =>
     narratives.filter(n => multiCats.size === 0 || multiCats.has(n.category)),
     [narratives, multiCats],
   )
 
-  // Merge orbital particles (static) + hotspot markers into one pointsData array.
-  // Particles come first so hotspot dots render on top of them visually.
-  const allPoints = useMemo(() => [...SCATTER_PARTICLES, ...globeSpots], [globeSpots])
+  // Search result marker — shown as a single label on the globe
+  const searchMarkers = useMemo(() =>
+    searchedLocation ? [searchedLocation] : [],
+    [searchedLocation],
+  )
 
   const maxSeverity = globeSpots.some(s => s.severity === 'high')   ? 'HIGH'
                     : globeSpots.some(s => s.severity === 'medium') ? 'MEDIUM' : 'LOW'
@@ -868,23 +794,59 @@ export default function Heatmap() {
           {/* ════ CENTER: Globe ════ */}
           <div ref={mapRef} style={{ flex: 1, position: 'relative', overflow: 'hidden', background: '#020509', minWidth: 0 }}>
 
-            {/* Feature 1: View mode — top left */}
+            {/* Location search — top left */}
             <div style={{
               position: 'absolute', top: 14, left: 14, zIndex: 10,
-              display: 'flex', gap: 2,
-              background: 'rgba(4,7,15,0.88)', border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: 8, padding: 3, backdropFilter: 'blur(8px)',
+              display: 'flex', gap: 5, alignItems: 'center',
             }}>
-              {VIEW_MODES.map(m => (
-                <button key={m} onClick={() => applyViewMode(m)} style={{
-                  padding: '4px 9px', borderRadius: 5, fontSize: 9, fontWeight: 700,
-                  cursor: 'pointer', border: 'none', letterSpacing: '0.05em',
-                  background: viewMode === m ? 'rgba(59,130,246,0.25)' : 'transparent',
-                  color: viewMode === m ? '#60a5fa' : '#334155', transition: 'all 0.15s',
-                }}>
-                  {m}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 0,
+                background: 'rgba(4,7,15,0.92)', border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 8, overflow: 'hidden', backdropFilter: 'blur(10px)',
+              }}>
+                <span style={{ padding: '0 8px', fontSize: 12, color: '#334155', pointerEvents: 'none' }}>🔍</span>
+                <input
+                  value={locationQuery}
+                  onChange={e => setLocationQuery(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && searchLocation()}
+                  placeholder="Search location…"
+                  style={{
+                    background: 'transparent', border: 'none', outline: 'none',
+                    fontSize: 11, color: '#e2e8f0', width: 160, padding: '7px 4px',
+                    fontFamily: 'inherit',
+                  }}
+                />
+                <button
+                  onClick={() => searchLocation()}
+                  disabled={locationSearching}
+                  style={{
+                    padding: '0 10px', height: '100%', minHeight: 30,
+                    background: locationSearching ? 'rgba(99,102,241,0.1)' : 'rgba(99,102,241,0.18)',
+                    border: 'none', borderLeft: '1px solid rgba(255,255,255,0.06)',
+                    color: locationSearching ? '#475569' : '#818cf8',
+                    fontSize: 11, cursor: locationSearching ? 'wait' : 'pointer',
+                    fontWeight: 600, transition: 'all 0.15s',
+                  }}
+                >
+                  {locationSearching ? '…' : '→'}
                 </button>
-              ))}
+              </div>
+              {searchedLocation && (
+                <div style={{
+                  padding: '5px 10px', borderRadius: 6, fontSize: 10,
+                  background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)',
+                  color: '#818cf8', backdropFilter: 'blur(10px)',
+                  display: 'flex', alignItems: 'center', gap: 6, maxWidth: 180,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>
+                  <span style={{ color: '#f59e0b' }}>📍</span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{searchedLocation.name}</span>
+                  <button
+                    onClick={() => { setSearchedLocation(null); setLocationQuery('') }}
+                    style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', padding: 0, fontSize: 12, lineHeight: 1, flexShrink: 0 }}
+                  >×</button>
+                </div>
+              )}
             </div>
 
             {/* Time + mode indicator — top center */}
@@ -899,19 +861,6 @@ export default function Heatmap() {
               {isPlaying && <span style={{ marginLeft: 8, color: '#ef4444' }}>▶ PLAYING</span>}
             </div>
 
-            {/* Feature 6: Arc toggle — top right */}
-            <div style={{ position: 'absolute', top: 14, right: 14, zIndex: 10 }}>
-              <button onClick={() => setShowArcs(p => !p)} style={{
-                padding: '5px 10px', borderRadius: 7, fontSize: 9, fontWeight: 700,
-                cursor: 'pointer', letterSpacing: '0.05em',
-                border: `1px solid ${showArcs ? 'rgba(59,130,246,0.4)' : 'rgba(255,255,255,0.08)'}`,
-                background: showArcs ? 'rgba(59,130,246,0.15)' : 'rgba(4,7,15,0.88)',
-                color: showArcs ? '#60a5fa' : '#334155', backdropFilter: 'blur(8px)',
-                transition: 'all 0.15s',
-              }}>
-                ↗ Arcs {showArcs ? 'ON' : 'OFF'}
-              </button>
-            </div>
 
             {mapW > 0 && mapH > 0 && (
               <Globe
@@ -925,47 +874,23 @@ export default function Heatmap() {
                 atmosphereAltitude={0.18}
                 showGraticules
 
-                /* Country polygon overlay */
+                /* Country polygon overlay — clean subtle fill, no political colors */
                 polygonsData={countries.features}
-                polygonCapColor={getCountryColor}
-                polygonSideColor={() => 'rgba(0,0,0,0.2)'}
-                polygonStrokeColor={() => 'rgba(255,255,255,0.1)'}
-                polygonAltitude={0.006}
-                polygonLabel={({ properties: d }) => `
-                  <div style="background:rgba(4,7,15,0.96);border:1px solid rgba(59,130,246,0.35);border-radius:6px;padding:4px 9px;font-size:11px;color:#e2e8f0;font-weight:600;">
-                    ${d.ADMIN}
-                  </div>
-                `}
+                polygonCapColor={() => 'rgba(18,28,50,0.45)'}
+                polygonSideColor={() => 'rgba(0,0,0,0)'}
+                polygonStrokeColor={() => 'rgba(148,163,184,0.13)'}
+                polygonAltitude={0.004}
 
-                /* Country name labels */
-                labelsData={countryLabels}
+                /* Search result marker label */
+                labelsData={searchMarkers}
                 labelLat={d => d.lat}
                 labelLng={d => d.lng}
-                labelText={d => d.name}
-                labelSize={0.36}
-                labelColor={() => 'rgba(255,255,255,0.5)'}
-                labelDotRadius={0}
-                labelAltitude={0.012}
+                labelText={d => `📍 ${d.name}`}
+                labelSize={0.55}
+                labelColor={() => '#fbbf24'}
+                labelDotRadius={0.4}
+                labelAltitude={0.015}
                 labelResolution={2}
-
-                /* Feature 6: Narrative Spread Arcs */
-                arcsData={narrativeArcs}
-                arcStartLat={d => d.startLat}
-                arcStartLng={d => d.startLng}
-                arcEndLat={d => d.endLat}
-                arcEndLng={d => d.endLng}
-                /* Very minimal arc movement — slow drift, barely perceptible */
-                arcColor={() => ['rgba(200,150,0,0)', 'rgba(212,168,0,0.55)', 'rgba(200,150,0,0.04)']}
-                arcAltitudeAutoScale={0.32}
-                arcDashLength={0.85}
-                arcDashGap={0.02}
-                arcDashAnimateTime={10000}
-                arcStroke={0.55}
-                arcLabel={d => `
-                  <div style="background:rgba(4,7,15,0.96);border:1px solid rgba(59,130,246,0.3);border-radius:5px;padding:4px 8px;font-size:10px;color:#94a3b8;">
-                    ${d.label} · ${d.category}
-                  </div>
-                `}
 
                 /* Feature 7: rings — anomaly hotspots pulse faster */
                 ringsData={globeSpots}
@@ -974,15 +899,11 @@ export default function Heatmap() {
                 ringPropagationSpeed={ringSpeed}
                 ringRepeatPeriod={ringPeriod}
 
-                /* Merged layer: orbital particles + hotspot markers.
-                 * Particles use _type='particle'; hotspots use _type undefined. */
-                pointsData={allPoints}
-                pointColor={p => p._type === 'particle'
-                  ? 'rgba(212,168,0,0.55)'
-                  : SEV[p.severity].ring}
-                pointAltitude={p => p._type === 'particle' ? p.altitude : 0.06}
-                pointRadius={p => p._type === 'particle' ? p.size : pointRadius(p)}
-                pointLabel={p => p._type === 'particle' ? '' : `
+                pointsData={globeSpots}
+                pointColor={p => SEV[p.severity].ring}
+                pointAltitude={0.06}
+                pointRadius={pointRadius}
+                pointLabel={p => `
                   <div style="background:rgba(4,7,15,0.97);border:1px solid ${SEV[p.severity].ring}88;border-radius:8px;padding:7px 11px;font-size:11px;white-space:nowrap;box-shadow:0 4px 20px ${SEV[p.severity].ring}40;">
                     <div style="color:${SEV[p.severity].ring};font-weight:800;font-size:13px;margin-bottom:3px;">
                       ${p.label}
@@ -998,8 +919,8 @@ export default function Heatmap() {
                   </div>
                 `}
 
-                /* Feature 5: click → Hotspot Detection Panel (particles ignored) */
-                onPointClick={p => p._type !== 'particle' && handlePointClick(p)}
+                /* Feature 5: click → Hotspot Detection Panel */
+                onPointClick={handlePointClick}
 
                 onGlobeReady={() => {
                   if (!globeRef.current) return
@@ -1030,12 +951,6 @@ export default function Heatmap() {
                   {val.label}
                 </div>
               ))}
-              {showArcs && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: '#475569', paddingTop: 4, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                  <span style={{ width: 18, height: 2, background: '#d4a800', borderRadius: 1, boxShadow: '0 0 4px #d4a80088' }} />
-                  Narrative arc
-                </div>
-              )}
             </div>
 
             {/* Usage hint */}
