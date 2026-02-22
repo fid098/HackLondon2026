@@ -1,13 +1,13 @@
-# TruthGuard
+# Veryfi
 
 > AI-powered misinformation detection, deepfake analysis, and real-time heatmaps.
 
 ## What it does
 
-- **AI Analysis Suite**: Submit a URL, text, image, audio, or video → runs fact-check debate + deepfake detection + scam detection simultaneously
-- **Heatmap Dashboard**: World map of misinformation hotspots powered by MongoDB geospatial queries
-- **Report Archive**: Every analysis is saved; full-text search, PDF/JSON export
-- **Chrome Extension**: Non-disruptive flags on X/Instagram; highlight text → instant analysis
+- **AI Analysis Suite**: Submit a URL, text, image, audio, or video → runs fact-check debate, deepfake detection, and scam detection.  
+- **Heatmap Dashboard**: Interactive world map showing misinformation hotspots using MongoDB geospatial queries.  
+- **Report Archive**: Track all analyses with full-text search, PDF/JSON export.  
+- **Chrome Extension**: Highlights content on pages (e.g., X/Instagram) and provides instant credibility reports.  
 
 ## Stack
 
@@ -51,7 +51,7 @@ Expected output:
 ```
 INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
 INFO:     Started reloader process using WatchFiles
-INFO:     Starting TruthGuard API (env: development)
+INFO:     Starting Veryfi API (env: development)
 INFO:     MongoDB connection established (db: HackLdn)
 INFO:     Application startup complete.
 ```
@@ -145,14 +145,14 @@ useradd -m -s /bin/bash deploy && usermod -aG docker deploy
 3. **Network Access**: allow your Vultr IP
 4. Copy your connection string:
    ```
-   mongodb+srv://<user>:<pass>@<cluster>.mongodb.net/truthguard?retryWrites=true&w=majority
+   mongodb+srv://<user>:<pass>@<cluster>.mongodb.net/veryfi?retryWrites=true&w=majority
    ```
 
 ### Step 4 — Clone & Configure
 
 ```bash
 su deploy && cd ~
-git clone <your-repo-url> truthguard && cd truthguard
+git clone <your-repo-url> veryfi && cd veryfi
 cp apps/backend/.env.example apps/backend/.env
 nano apps/backend/.env
 ```
@@ -191,7 +191,7 @@ docker compose -f docker-compose.prod.yml restart nginx
 
 Auto-renew (crontab):
 ```
-0 3 * * * certbot renew --quiet && docker compose -f /home/deploy/truthguard/docker-compose.prod.yml restart nginx
+0 3 * * * certbot renew --quiet && docker compose -f /home/deploy/veryfi/docker-compose.prod.yml restart nginx
 ```
 
 ### Step 7 — DNS
@@ -222,7 +222,7 @@ docker compose -f docker-compose.prod.yml restart api
 
 ## Disclaimer
 
-TruthGuard provides **probabilistic** assessments. Results are not guaranteed to be accurate and should not be the sole basis for any decision. Always verify with primary sources.
+Veryfi provides **probabilistic** assessments. Results are not guaranteed to be accurate and should not be the sole basis for any decision. Always verify with primary sources.
 
 ---
 
