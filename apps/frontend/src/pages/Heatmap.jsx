@@ -44,6 +44,7 @@ import RightSimulationPanel from '../components/heatmap/RightSimulationPanel'
 import GlobeOverlayLayer from '../components/heatmap/GlobeOverlayLayer'
 import SearchBar from '../components/common/SearchBar'
 import GlobeLegend from '../components/common/GlobeLegend'
+import RegionIntelPanel from '../components/heatmap/RegionIntelPanel'
 
 /* ─── Constants ──────────────────────────────────────────────────────────── */
 
@@ -265,8 +266,65 @@ export default function Heatmap() {
     return multiCats.has(c)
   }, [multiCats])
 
+  /* ── Region polygon click (Phase 4) ── */
+  const [selectedRegionData, setSelectedRegionData] = useState(null)
+
+  /* ── Helpers ─────────────────────────────────────────────────────────── */
+
+  // Compute the centroid of a GeoJSON polygon feature.
+  // Handles both Polygon and MultiPolygon types.
+  function getFeatureCentroid(feature) {
+    try {
+      const coords = feature.geometry.type === 'MultiPolygon'
+        ? feature.geometry.coordinates[0][0]
+        : feature.geometry.coordinates[0]
+      const lng = coords.reduce((s, p) => s + p[0], 0) / coords.length
+      const lat = coords.reduce((s, p) => s + p[1], 0) / coords.length
+      return { lat, lng }
+    } catch (_) {
+      return { lat: 0, lng: 0 }
+    }
+  }
+
+  // Map a lat/lng centroid to a macro-region name matching our RegionStats data.
+  function centroidToRegionName(lat, lng) {
+    if (lat > 15  && lng > -170 && lng < -60)  return 'North America'
+    if (lat < 15  && lat > -60  && lng > -90  && lng < -30) return 'South America'
+    if (lat > 35  && lng > -15  && lng < 45)  return 'Europe'
+    if (lat > 12  && lat < 42   && lng > 25   && lng < 65)  return 'Middle East'
+    if (lat > -40 && lat < 40   && lng > -20  && lng < 55)  return 'Africa'
+    return 'Asia Pacific'
+  }
+
+  /* ── Polygon click handler ── */
+  const handlePolygonClick = useCallback((feature) => {
+    const countryName = feature.properties?.ADMIN ?? feature.properties?.NAME ?? 'Unknown'
+    const centroid    = getFeatureCentroid(feature)
+    const regionName  = centroidToRegionName(centroid.lat, centroid.lng)
+    const region      = regions.find(r => r.name === regionName) ?? null
+
+    // Find hotspots within ~30° of the centroid (rough geographic cluster)
+    const cluster = hotspots.filter(h => {
+      if (h.lat == null || h.lng == null) return false
+      return Math.hypot(h.lat - centroid.lat, h.lng - centroid.lng) < 30
+    }).sort((a, b) => (a.reality_score ?? 50) - (b.reality_score ?? 50))
+
+    // Pick nearest hotspot as the primary signal source
+    const nearest = cluster.reduce((best, h) => {
+      const d = Math.hypot(h.lat - centroid.lat, h.lng - centroid.lng)
+      return d < best.d ? { h, d } : best
+    }, { h: null, d: Infinity }).h
+
+    setSelectedRegionData({ countryName, centroid, region, hotspotCluster: cluster, nearestHotspot: nearest })
+    // Close the hotspot detail panel when switching to region view
+    setSelectedHotspot(null)
+  }, [regions, hotspots])
+
   /* ── Feature 5: Point click ── */
-  const handlePointClick = useCallback((spot) => setSelectedHotspot(spot), [])
+  const handlePointClick = useCallback((spot) => {
+    setSelectedHotspot(spot)
+    setSelectedRegionData(null) // close region panel when opening hotspot panel
+  }, [])
 
   /* ── Feature 7: Ring speed for anomalies ── */
   const ringSpeed = useCallback((s) => s.isCoordinated || s.isSpikeAnomaly ? 4.5 : 2.5, [])
@@ -408,12 +466,26 @@ export default function Heatmap() {
                   atmosphereAltitude={0.18}
                   showGraticules
 
-                  /* Country polygon overlay — clean subtle fill, no political colors */
+                  /* Country polygon overlay — highlights selected country */
                   polygonsData={countries.features}
-                  polygonCapColor={() => 'rgba(18,28,50,0.45)'}
+                  polygonCapColor={f => {
+                    const name = f.properties?.ADMIN ?? f.properties?.NAME
+                    return name === selectedRegionData?.countryName
+                      ? 'rgba(59,130,246,0.22)'
+                      : 'rgba(18,28,50,0.45)'
+                  }}
                   polygonSideColor={() => 'rgba(0,0,0,0)'}
-                  polygonStrokeColor={() => 'rgba(148,163,184,0.13)'}
-                  polygonAltitude={0.004}
+                  polygonStrokeColor={f => {
+                    const name = f.properties?.ADMIN ?? f.properties?.NAME
+                    return name === selectedRegionData?.countryName
+                      ? 'rgba(99,130,246,0.5)'
+                      : 'rgba(148,163,184,0.13)'
+                  }}
+                  polygonAltitude={f => {
+                    const name = f.properties?.ADMIN ?? f.properties?.NAME
+                    return name === selectedRegionData?.countryName ? 0.012 : 0.004
+                  }}
+                  onPolygonClick={handlePolygonClick}
 
                   /* Search result marker label */
                   labelsData={searchMarkers}
@@ -496,6 +568,12 @@ export default function Heatmap() {
 
               {/* Simulation result overlay — pure HTML, does not touch Globe internals */}
               <GlobeOverlayLayer />
+
+              {/* Region Intelligence overlay — shown on polygon click */}
+              <RegionIntelPanel
+                data={selectedRegionData}
+                onClose={() => setSelectedRegionData(null)}
+              />
             </div>
 
             {/* ════ RIGHT PANEL ════ */}
