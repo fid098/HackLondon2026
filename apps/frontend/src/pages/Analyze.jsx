@@ -47,11 +47,12 @@
  * See docs/developers/ISHAAN.md for full task list and backend guide.
  */
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   analyzeDeepfakeAudio,
   analyzeDeepfakeImage,
   analyzeDeepfakeVideo,
+  analyzeYouTube,
   checkScam,
   saveReport,
   submitClaim,
@@ -120,6 +121,18 @@ const MOCK_SCAM = {
 
 const MOCK_DEEPFAKE = { is_deepfake: false, is_synthetic: false, confidence: 0.5, reasoning: '[Demo] No backend running — start the API for real analysis.' }
 
+const MOCK_YOUTUBE = {
+  video_id: 'demo', title: 'Demo Video', channel: 'Demo Channel',
+  verdict: 'UNCERTAIN', confidence: 50,
+  summary: '[Demo] No backend running — start the API for real analysis.',
+  ai_indicators: ['Could not connect to backend'], human_indicators: [],
+  thumbnail_is_ai: false, thumbnail_confidence: 0.0,
+  defender_argument: '[Demo] Defender argument unavailable.',
+  prosecutor_argument: '[Demo] Prosecutor argument unavailable.',
+  judge_reasoning: '[Demo] Judge reasoning unavailable.',
+  has_transcript: false, thumbnail_url: '',
+}
+
 /* ─── verdict colours ────────────────────────────────────────────────────────── */
 
 const VERDICT_STYLES = {
@@ -142,9 +155,9 @@ function Tab({ id, label, icon, active, onClick }) {
     <button
       onClick={() => onClick(id)}
       className={['flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 focus:outline-none',
-        active ? 'text-emerald-400' : 'text-slate-500 hover:text-slate-300'].join(' ')}
+        active ? 'text-red-400' : 'text-slate-500 hover:text-slate-300'].join(' ')}
       style={active
-        ? { background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)' }
+        ? { background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)' }
         : { background: 'transparent', border: '1px solid transparent' }}
     >
       <span>{icon}</span>{label}
@@ -232,7 +245,7 @@ function FactCard({ result, onSave }) {
           <p className="text-xs text-slate-600 uppercase tracking-widest mb-2">Sources</p>
           {result.sources.map((s, i) => (
             <a key={i} href={s.url} target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-2 text-xs text-slate-500 hover:text-emerald-400 transition-colors mb-1">
+              className="flex items-center gap-2 text-xs text-slate-500 hover:text-red-400 transition-colors mb-1">
               <span className="text-slate-700 font-mono shrink-0">[{i + 1}]</span>{s.title}
               <span className="text-slate-700">↗</span>
             </a>
@@ -360,6 +373,297 @@ function DeepfakeCard({ result, mediaKind }) {
   )
 }
 
+/* ─── debate transcript components ───────────────────────────────────────────── */
+
+/**
+ * Renders one agent's argument with inline [Title](URL) markdown links made
+ * clickable, followed by a row of source chips.
+ */
+function DebateAgentCard({ label, icon, argument, sources, color, bg, border }) {
+  // Split argument text on markdown links and render each chunk appropriately
+  const renderArgument = (text) => {
+    const parts = text.split(/(\[[^\]]+\]\(https?:\/\/[^)]+\))/g)
+    return parts.map((part, i) => {
+      const match = part.match(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/)
+      if (match) {
+        return (
+          <a key={i} href={match[2]} target="_blank" rel="noopener noreferrer"
+            className="underline transition-opacity hover:opacity-75" style={{ color }}>
+            {match[1]}
+          </a>
+        )
+      }
+      return <span key={i}>{part}</span>
+    })
+  }
+
+  return (
+    <div className="rounded-xl p-5" style={{ background: bg, border: `1px solid ${border}` }}>
+      <p className="text-xs font-semibold mb-3" style={{ color }}>{icon} {label}</p>
+      <p className="text-slate-300 text-sm leading-relaxed mb-4">
+        {renderArgument(argument)}
+      </p>
+      {sources?.length > 0 && (
+        <div>
+          <p className="text-xs text-slate-600 uppercase tracking-widest mb-2">Sources cited</p>
+          <div className="flex flex-wrap gap-2">
+            {sources.map((s, i) => (
+              <a key={i} href={s.url || '#'} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg transition-opacity hover:opacity-75"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', color: '#94a3b8' }}>
+                <span className="text-slate-600 font-mono shrink-0">[{i + 1}]</span>
+                <span className="truncate max-w-[180px]">{s.title}</span>
+                <span className="text-slate-700 shrink-0">↗</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Collapsible panel showing the full Pro → Con → Judge debate transcript.
+ * Rendered below the FactCard/ScamCard grid whenever factResult.debate exists.
+ */
+function DebateBox({ debate }) {
+  const [open, setOpen] = useState(true)
+  if (!debate) return null
+
+  return (
+    <div className="rounded-2xl overflow-hidden"
+      style={{ border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.01)' }}>
+
+      {/* Toggle header */}
+      <button onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-6 py-4 text-left transition-colors hover:bg-white/[0.02]"
+        style={{ background: 'rgba(255,255,255,0.02)' }}>
+        <div className="flex items-center gap-3">
+          <span className="text-base select-none">⚖️</span>
+          <span className="text-sm font-semibold text-slate-300">AI Debate Transcript</span>
+          <span className="text-xs px-2 py-0.5 rounded-full text-slate-500"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            3 agents
+          </span>
+        </div>
+        <span className="text-slate-600 text-xs font-medium">{open ? '▲ Collapse' : '▼ Expand'}</span>
+      </button>
+
+      {open && (
+        <div className="px-6 pb-6 pt-3 space-y-4">
+
+          {/* Agent A — Pro */}
+          <DebateAgentCard
+            label="Agent A — Supporting Evidence"
+            icon="🟢"
+            argument={debate.pro_argument}
+            sources={debate.pro_sources}
+            color="#10b981"
+            bg="rgba(16,185,129,0.04)"
+            border="rgba(16,185,129,0.14)"
+          />
+
+          {/* Agent B — Con */}
+          <DebateAgentCard
+            label="Agent B — Counter Evidence"
+            icon="🔴"
+            argument={debate.con_argument}
+            sources={debate.con_sources}
+            color="#ef4444"
+            bg="rgba(239,68,68,0.04)"
+            border="rgba(239,68,68,0.14)"
+          />
+
+          {/* Judge */}
+          <div className="rounded-xl p-5"
+            style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.16)' }}>
+            <p className="text-xs font-semibold text-indigo-400 mb-3">⚖️ Judge — Final Reasoning</p>
+            <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">
+              {debate.judge_reasoning}
+            </p>
+          </div>
+
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ─── YouTube AI-detection result card ───────────────────────────────────────── */
+
+const YT_VERDICT_STYLES = {
+  AI_GENERATED:  { color: '#ef4444', label: 'AI Generated',   bg: 'rgba(239,68,68,0.08)',  border: 'rgba(239,68,68,0.25)',  icon: '🤖' },
+  HUMAN_CREATED: { color: '#10b981', label: 'Human Created',  bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.25)', icon: '👤' },
+  UNCERTAIN:     { color: '#f59e0b', label: 'Uncertain',       bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.25)', icon: '❓' },
+}
+
+function YouTubeCard({ result }) {
+  const [debateOpen, setDebateOpen] = useState(true)
+  const vs = YT_VERDICT_STYLES[result.verdict] ?? YT_VERDICT_STYLES.UNCERTAIN
+  const thumbAiPct = Math.round(result.thumbnail_confidence * 100)
+  const c = 2 * Math.PI * 36
+
+  const renderArg = (text) => {
+    const parts = text.split(/(\[[^\]]+\]\(https?:\/\/[^)]+\))/g)
+    return parts.map((part, i) => {
+      const match = part.match(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/)
+      if (match) return <a key={i} href={match[2]} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-75" style={{ color: '#94a3b8' }}>{match[1]}</a>
+      return <span key={i}>{part}</span>
+    })
+  }
+
+  return (
+    <div className="rounded-2xl overflow-hidden flex flex-col gap-0"
+      style={{ border: `1px solid ${vs.border}`, background: vs.bg }}>
+
+      {/* ── Header ── */}
+      <div className="px-6 pt-6 pb-4 flex flex-col gap-4">
+        <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: vs.color }}>
+          ▶️ YouTube AI-Content Detection
+        </p>
+
+        <div className="flex gap-4 items-start">
+          {/* Thumbnail */}
+          {result.thumbnail_url ? (
+            <div className="relative shrink-0">
+              <img src={result.thumbnail_url} alt="thumbnail"
+                className="w-28 h-20 object-cover rounded-lg"
+                style={{ border: `2px solid ${result.thumbnail_is_ai ? '#ef4444' : 'rgba(255,255,255,0.1)'}` }} />
+              {result.thumbnail_is_ai && (
+                <div className="absolute -top-1.5 -right-1.5 text-xs px-1.5 py-0.5 rounded-full font-bold"
+                  style={{ background: '#ef4444', color: 'white' }}>AI</div>
+              )}
+            </div>
+          ) : (
+            <div className="w-28 h-20 rounded-lg shrink-0 flex items-center justify-center text-2xl"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>▶️</div>
+          )}
+
+          {/* Title + verdict */}
+          <div className="flex-1 min-w-0">
+            <p className="text-white font-semibold text-sm truncate">{result.title || 'Unknown title'}</p>
+            <p className="text-slate-500 text-xs mb-3">{result.channel || 'Unknown channel'}</p>
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-bold text-sm"
+                style={{ background: vs.bg, border: `1px solid ${vs.border}`, color: vs.color }}>
+                {vs.icon} {vs.label}
+              </div>
+              <span className="text-xl font-black" style={{ color: vs.color }}>{result.confidence}%</span>
+              {!result.has_transcript && (
+                <span className="text-xs px-2 py-0.5 rounded-full"
+                  style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', color: '#f59e0b' }}>
+                  ⚠ No captions
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <p className="text-slate-400 text-sm leading-relaxed">{result.summary}</p>
+      </div>
+
+      {/* ── Indicators ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 px-6 pb-4">
+        <div className="rounded-xl p-4" style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.12)' }}>
+          <p className="text-red-400 text-xs font-semibold mb-2">🤖 AI Indicators</p>
+          {result.ai_indicators.length > 0 ? (
+            <ul className="space-y-1">
+              {result.ai_indicators.map((ind, i) => (
+                <li key={i} className="text-slate-400 text-xs flex gap-2">
+                  <span className="text-red-700 shrink-0">•</span>{ind}
+                </li>
+              ))}
+            </ul>
+          ) : <p className="text-slate-600 text-xs">None detected.</p>}
+        </div>
+        <div className="rounded-xl p-4" style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.12)' }}>
+          <p className="text-emerald-400 text-xs font-semibold mb-2">👤 Human Indicators</p>
+          {result.human_indicators.length > 0 ? (
+            <ul className="space-y-1">
+              {result.human_indicators.map((ind, i) => (
+                <li key={i} className="text-slate-400 text-xs flex gap-2">
+                  <span className="text-emerald-700 shrink-0">•</span>{ind}
+                </li>
+              ))}
+            </ul>
+          ) : <p className="text-slate-600 text-xs">None detected.</p>}
+        </div>
+      </div>
+
+      {/* ── Thumbnail AI score ── */}
+      {result.thumbnail_url && (
+        <div className="mx-6 mb-4 rounded-xl p-3 flex items-center gap-3"
+          style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <span className="text-xs text-slate-500 shrink-0">Thumbnail AI score</span>
+          <div className="flex-1 rounded-full overflow-hidden" style={{ height: 4, background: 'rgba(255,255,255,0.06)' }}>
+            <div className="h-full rounded-full transition-all duration-700"
+              style={{ width: `${thumbAiPct}%`, background: result.thumbnail_is_ai ? '#ef4444' : '#10b981' }} />
+          </div>
+          <span className="text-xs font-semibold shrink-0"
+            style={{ color: result.thumbnail_is_ai ? '#ef4444' : '#10b981' }}>
+            {thumbAiPct}%
+          </span>
+        </div>
+      )}
+
+      {/* ── Debate transcript ── */}
+      <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <button onClick={() => setDebateOpen(o => !o)}
+          className="w-full flex items-center justify-between px-6 py-4 text-left transition-colors hover:bg-white/[0.02]"
+          style={{ background: 'rgba(255,255,255,0.02)' }}>
+          <div className="flex items-center gap-3">
+            <span className="text-base select-none">⚖️</span>
+            <span className="text-sm font-semibold text-slate-300">AI Debate Transcript</span>
+            <span className="text-xs px-2 py-0.5 rounded-full text-slate-500"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              3 agents
+            </span>
+          </div>
+          <span className="text-slate-600 text-xs font-medium">{debateOpen ? '▲ Collapse' : '▼ Expand'}</span>
+        </button>
+
+        {debateOpen && (
+          <div className="px-6 pb-6 pt-3 space-y-4">
+            {/* Defender */}
+            <div className="rounded-xl p-5" style={{ background: 'rgba(16,185,129,0.04)', border: '1px solid rgba(16,185,129,0.14)' }}>
+              <p className="text-xs font-semibold text-emerald-400 mb-3">👤 Agent A — Human Creation Defender</p>
+              <p className="text-slate-300 text-sm leading-relaxed">{renderArg(result.defender_argument)}</p>
+            </div>
+            {/* Prosecutor */}
+            <div className="rounded-xl p-5" style={{ background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.14)' }}>
+              <p className="text-xs font-semibold text-red-400 mb-3">🤖 Agent B — AI Generation Prosecutor</p>
+              <p className="text-slate-300 text-sm leading-relaxed">{renderArg(result.prosecutor_argument)}</p>
+            </div>
+            {/* Judge */}
+            <div className="rounded-xl p-5" style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.16)' }}>
+              <p className="text-xs font-semibold text-indigo-400 mb-3">⚖️ Judge — Final Reasoning</p>
+              <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">{result.judge_reasoning}</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ─── pipeline step labels (shown during fact-check loading) ─────────────────── */
+
+const PIPELINE_STEPS = [
+  { icon: '🔍', label: 'Searching the web for evidence…' },
+  { icon: '🟢', label: 'Agent A building supporting case…' },
+  { icon: '🔴', label: 'Agent B building counter-case…' },
+  { icon: '⚖️', label: 'Judge deliberating final verdict…' },
+]
+
+const YT_PIPELINE_STEPS = [
+  { icon: '▶️', label: 'Extracting transcript and metadata…' },
+  { icon: '🖼', label: 'Scanning thumbnail for AI generation…' },
+  { icon: '👤', label: 'Defender building human-creation case…' },
+  { icon: '🤖', label: 'Prosecutor building AI-generation case…' },
+  { icon: '⚖️', label: 'Judge issuing verdict…' },
+]
+
 /* ─── main component ─────────────────────────────────────────────────────────── */
 
 export default function Analyze() {
@@ -370,18 +674,32 @@ export default function Analyze() {
   const [dragOver,      setDragOver]      = useState(false)
   const [loading,       setLoading]       = useState(false)
   const [error,         setError]         = useState(null)
-  const [factResult,    setFactResult]    = useState(null)
-  const [scamResult,    setScamResult]    = useState(null)
+  const [factResult,     setFactResult]     = useState(null)
+  const [scamResult,     setScamResult]     = useState(null)
   const [deepfakeResult, setDeepfakeResult] = useState(null)
-  const [mediaKind,     setMediaKind]     = useState(null)
-  const [feedback,      setFeedback]      = useState(null)
+  const [youtubeResult,  setYoutubeResult]  = useState(null)
+  const [mediaKind,      setMediaKind]      = useState(null)
+  const [feedback,       setFeedback]       = useState(null)
+  const [pipelineStep,   setPipelineStep]   = useState(-1)
   const fileRef = useRef(null)
+
+  // Advance the pipeline step indicator every ~2 s while a text/URL analysis is running.
+  useEffect(() => {
+    if (!loading || tab === 'media') { setPipelineStep(-1); return }
+    setPipelineStep(0)
+    const isYouTube = tab === 'url' && isYouTubeUrl(url)
+    const steps = isYouTube ? YT_PIPELINE_STEPS : PIPELINE_STEPS
+    const id = setInterval(() => {
+      setPipelineStep(s => (s < steps.length - 1 ? s + 1 : s))
+    }, 2200)
+    return () => clearInterval(id)
+  }, [loading, tab, url])
 
   // Reset all result state. Called before each new analysis and when switching tabs.
   // Not resetting before a new analysis would cause stale results to flash briefly.
   const clearResults = () => {
     setFactResult(null); setScamResult(null); setDeepfakeResult(null)
-    setMediaKind(null); setFeedback(null); setError(null)
+    setYoutubeResult(null); setMediaKind(null); setFeedback(null); setError(null)
   }
 
   /* ── file selection ── */
@@ -439,6 +757,11 @@ export default function Analyze() {
           ])
           setDeepfakeResult(df.status === 'fulfilled' ? df.value : MOCK_DEEPFAKE)
         }
+
+      } else if (tab === 'url' && isYouTubeUrl(url)) {
+        // YouTube URL: run the dedicated AI-content detection pipeline
+        const [ytRes] = await Promise.allSettled([analyzeYouTube({ url })])
+        setYoutubeResult(ytRes.status === 'fulfilled' ? ytRes.value : MOCK_YOUTUBE)
 
       } else {
         // URL or Text tab: fact-check + scam check run in parallel.
@@ -510,22 +833,24 @@ export default function Analyze() {
   )
 
   const isYT        = tab === 'url' && isYouTubeUrl(url)
-  const hasResults  = factResult || scamResult || deepfakeResult
+  const hasResults  = factResult || scamResult || deepfakeResult || youtubeResult
   const kind        = mediaFile ? detectKind(mediaFile) : null
   const kindIcon    = { image: '🖼', audio: '🎵', video: '🎬' }
 
   return (
     <div className="relative max-w-5xl mx-auto px-5 py-14">
 
-      {/* ── Background orbs ── */}
+      {/* ── Background shapes ── */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden>
-        <div className="orb orb-green"  style={{ width: 500, height: 500, top: '-10%',  left: '-10%',  opacity: 0.09 }} />
-        <div className="orb orb-violet" style={{ width: 400, height: 400, bottom: '5%', right: '-15%', opacity: 0.07 }} />
+        <div className="absolute rounded-full blur-3xl" style={{ width: 520, height: 520, top: '-12%', left: '-12%', background: 'radial-gradient(circle, rgba(239,68,68,0.22), transparent 70%)' }} />
+        <div className="absolute blur-3xl" style={{ width: 420, height: 280, top: '35%', right: '-8%', borderRadius: '60% 40% 40% 60% / 50% 60% 40% 50%', background: 'radial-gradient(circle, rgba(185,28,28,0.18), transparent 70%)' }} />
+        <div className="absolute rounded-full blur-2xl" style={{ width: 280, height: 280, bottom: '8%', left: '25%', background: 'radial-gradient(circle, rgba(239,68,68,0.14), transparent 70%)' }} />
+        <div className="absolute blur-3xl" style={{ width: 320, height: 200, top: '60%', left: '-5%', borderRadius: '40% 60%', background: 'radial-gradient(circle, rgba(220,38,38,0.12), transparent 70%)' }} />
       </div>
 
       {/* ── Page header ── */}
       <div className="mb-10">
-        <p className="text-xs text-emerald-500 uppercase tracking-[3px] font-semibold mb-3">
+        <p className="text-xs text-red-500 uppercase tracking-[3px] font-semibold mb-3">
           AI Analysis Suite
         </p>
         <h1 className="text-4xl font-extrabold text-white mb-2">Analyze Content</h1>
@@ -583,7 +908,7 @@ export default function Analyze() {
               rows={7} className="input-field w-full resize-none" style={{ lineHeight: 1.6 }} />
             <div className="flex justify-between text-xs">
               <span className="text-slate-600">Minimum 20 characters</span>
-              <span className={text.length < 20 ? 'text-slate-600' : 'text-emerald-500'}>
+              <span className={text.length < 20 ? 'text-slate-600' : 'text-red-500'}>
                 {text.length.toLocaleString()} chars
               </span>
             </div>
@@ -598,8 +923,8 @@ export default function Analyze() {
               onDrop={onDrop} onClick={() => fileRef.current?.click()}
               className="rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-3 py-12 cursor-pointer transition-all duration-200"
               style={{
-                borderColor: dragOver ? 'rgba(16,185,129,0.6)' : 'rgba(255,255,255,0.1)',
-                background:  dragOver ? 'rgba(16,185,129,0.05)' : 'rgba(255,255,255,0.01)',
+                borderColor: dragOver ? 'rgba(239,68,68,0.6)' : 'rgba(255,255,255,0.1)',
+                background:  dragOver ? 'rgba(239,68,68,0.05)' : 'rgba(255,255,255,0.01)',
               }}>
               <span className="text-4xl select-none">{mediaFile ? (kindIcon[kind] ?? '📁') : '📂'}</span>
               {mediaFile ? (
@@ -636,15 +961,32 @@ export default function Analyze() {
         )}
 
         {/* ── Analyse button ── */}
-        <div className="mt-7 flex items-center gap-4">
-          <button onClick={handleAnalyse} disabled={!canSubmit}
-            className="btn-primary px-9 py-3.5 flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed">
-            {loading ? <><span className="spinner" />Analysing…</> : <><span>🔍</span>Analyse</>}
-          </button>
-          {loading && (
-            <p className="text-xs text-slate-600 animate-pulse">
-              {tab === 'media' ? 'Running detection…' : 'Fact-checking + scam check in parallel…'}
-            </p>
+        <div className="mt-7 flex flex-col gap-4">
+          <div className="flex items-center gap-4">
+            <button onClick={handleAnalyse} disabled={!canSubmit}
+              className="btn-primary px-9 py-3.5 flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed">
+              {loading ? <><span className="spinner" />Analysing…</> : <><span>🔍</span>Analyse</>}
+            </button>
+            {loading && tab === 'media' && (
+              <p className="text-xs text-slate-600 animate-pulse">Running detection…</p>
+            )}
+          </div>
+
+          {/* Pipeline step indicator — text / URL fact-check only */}
+          {loading && tab !== 'media' && (
+            <div className="flex flex-col gap-1.5 pl-1">
+              {(isYT ? YT_PIPELINE_STEPS : PIPELINE_STEPS).map((step, i) => {
+                const done    = i < pipelineStep
+                const active  = i === pipelineStep
+                return (
+                  <div key={i} className="flex items-center gap-2 text-xs transition-all duration-300"
+                    style={{ color: done ? '#10b981' : active ? '#e2e8f0' : '#334155', opacity: done || active ? 1 : 0.45 }}>
+                    <span style={{ fontSize: 11 }}>{done ? '✓' : step.icon}</span>
+                    <span className={active ? 'animate-pulse' : ''}>{step.label}</span>
+                  </div>
+                )
+              })}
+            </div>
           )}
         </div>
       </div>
@@ -659,6 +1001,16 @@ export default function Analyze() {
               <FactCard result={factResult} onSave={handleSave} />
               <ScamCard result={scamResult} feedback={feedback} onFeedback={handleFeedback} />
             </div>
+          )}
+
+          {/* Debate transcript — shown whenever a fact-check debate is available */}
+          {factResult?.debate && (
+            <DebateBox debate={factResult.debate} />
+          )}
+
+          {/* YouTube: AI-content detection card (full width) */}
+          {youtubeResult && (
+            <YouTubeCard result={youtubeResult} />
           )}
 
           {/* Media: deepfake card (full width) */}
@@ -681,11 +1033,6 @@ export default function Analyze() {
         </div>
       )}
 
-      {/* ── Disclaimer ── */}
-      <p className="text-center text-xs text-slate-700 mt-10 max-w-xl mx-auto leading-relaxed">
-        TruthGuard provides <em>probabilistic assessments only</em>. Results should not be
-        the sole basis for any decision. Always verify with primary sources.
-      </p>
     </div>
   )
 }

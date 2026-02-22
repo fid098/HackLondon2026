@@ -15,6 +15,7 @@ on shutdown — this is the recommended pattern over @app.on_event.
 import logging
 import re
 
+import certifi
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from app.core.config import settings
@@ -50,10 +51,14 @@ async def connect_to_mongo() -> None:
     """
     logger.info("Connecting to MongoDB at %s", _redact_uri(settings.mongo_uri))
     try:
+        # Use certifi's CA bundle so Atlas TLS works on macOS/Linux without
+        # system-level cert workarounds (the default Python ssl context doesn't
+        # include the CA that signed MongoDB Atlas's certificate on macOS).
         db_client.client = AsyncIOMotorClient(
             settings.mongo_uri,
             # Fail fast in tests; real deployments use the URI default (30s)
             serverSelectionTimeoutMS=5000,
+            tlsCAFile=certifi.where(),
         )
         db_client.db = db_client.client[settings.mongo_db_name]
         # Validate connection immediately — don't wait for first query
@@ -76,21 +81,18 @@ async def close_mongo_connection() -> None:
         logger.info("MongoDB connection closed")
 
 
-def get_db() -> AsyncIOMotorDatabase:
+def get_db() -> AsyncIOMotorDatabase | None:
     """
     FastAPI dependency — inject the database into route handlers.
 
-    Usage in a route:
-        from fastapi import Depends
-        from app.core.database import get_db
+    Returns None when MongoDB is unavailable so routes can degrade
+    gracefully (skip persistence) rather than returning 500 errors.
 
-        @router.get("/items")
-        async def list_items(db: AsyncIOMotorDatabase = Depends(get_db)):
-            return await db.items.find().to_list(100)
+    Usage in a route:
+        async def my_route(db = Depends(get_db)):
+            if db is not None:
+                await db.collection.insert_one(doc)
     """
-    if db_client.db is None:
-        # This will surface as a 500 — callers should handle it
-        raise RuntimeError("Database not connected. Was connect_to_mongo() called at startup?")
     return db_client.db
 
 

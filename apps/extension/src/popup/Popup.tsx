@@ -59,13 +59,13 @@ const DEFAULT_SETTINGS: Settings = {
 }
 
 const C = {
-  bg: '#0f172a',
+  bg: '#04040a',
   surface: 'rgba(255,255,255,0.04)',
   border: 'rgba(255,255,255,0.08)',
   text: '#f1f5f9',
   muted: '#64748b',
-  accent: '#34d399',
-  violet: '#818cf8',
+  brand: '#ef4444',
+  green: '#34d399',
   red: '#ef4444',
   amber: '#f59e0b',
 } as const
@@ -513,7 +513,7 @@ export default function Popup() {
       style={{
         width: 340,
         padding: 16,
-        fontFamily: 'system-ui,-apple-system,sans-serif',
+        fontFamily: "'Inter','system-ui',-apple-system,sans-serif",
         background: C.bg,
         color: C.text,
         minHeight: 320,
@@ -525,14 +525,14 @@ export default function Popup() {
           height="18"
           viewBox="0 0 24 24"
           fill="none"
-          stroke={C.accent}
+          stroke={C.brand}
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
         >
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
         </svg>
-        <span style={{ fontSize: 17, fontWeight: 700, color: C.accent }}>TruthGuard</span>
+        <span style={{ fontSize: 17, fontWeight: 700, color: C.brand }}>TruthGuard</span>
 
         <button
           onClick={() => void toggleEnabled()}
@@ -548,7 +548,7 @@ export default function Popup() {
             fontSize: 11,
             fontWeight: 700,
             background: settings.enabled ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.12)',
-            color: settings.enabled ? C.accent : C.red,
+            color: settings.enabled ? C.green : C.red,
             border: `1px solid ${settings.enabled ? 'rgba(16,185,129,0.35)' : 'rgba(239,68,68,0.3)'}`,
             cursor: 'pointer',
           }}
@@ -600,7 +600,7 @@ export default function Popup() {
             fontSize: 11,
             fontWeight: 700,
             background: settings.meetingModeEnabled ? 'rgba(99,102,241,0.2)' : 'rgba(100,116,139,0.15)',
-            color: settings.meetingModeEnabled ? C.violet : C.muted,
+            color: settings.meetingModeEnabled ? '#818cf8' : C.muted,
             border: `1px solid ${settings.meetingModeEnabled ? 'rgba(99,102,241,0.4)' : 'rgba(100,116,139,0.3)'}`,
             cursor: meetingBusy ? 'wait' : settings.enabled ? 'pointer' : 'not-allowed',
             opacity: settings.enabled && !meetingBusy ? 1 : 0.45,
@@ -620,7 +620,7 @@ export default function Popup() {
           fontSize: 11,
           marginBottom: 10,
           background: status === 'connected' ? '#064e3b' : status === 'checking' ? '#1e293b' : '#450a0a',
-          color: status === 'connected' ? C.accent : status === 'checking' ? C.muted : '#fca5a5',
+          color: status === 'connected' ? C.green : status === 'checking' ? C.muted : '#fca5a5',
           border: '1px solid',
           borderColor: status === 'connected' ? '#065f46' : status === 'checking' ? '#334155' : '#7f1d1d',
         }}
@@ -630,7 +630,7 @@ export default function Popup() {
             width: 6,
             height: 6,
             borderRadius: '50%',
-            background: status === 'connected' ? C.accent : status === 'checking' ? C.muted : '#f87171',
+            background: status === 'connected' ? C.green : status === 'checking' ? C.muted : '#f87171',
           }}
         />
         {statusLabel}
@@ -673,7 +673,7 @@ export default function Popup() {
           fontWeight: 600,
           cursor: meetingBusy ? 'wait' : 'pointer',
           background: 'rgba(52,211,153,0.12)',
-          color: C.accent,
+          color: C.green,
           border: '1px solid rgba(52,211,153,0.35)',
           marginBottom: 8,
           opacity: meetingBusy || status !== 'connected' || !settings.meetingModeEnabled ? 0.45 : 1,
@@ -692,9 +692,9 @@ export default function Popup() {
           fontSize: 12,
           fontWeight: 600,
           cursor: analysing ? 'wait' : 'pointer',
-          background: 'rgba(99,102,241,0.15)',
-          color: C.violet,
-          border: '1px solid rgba(99,102,241,0.35)',
+          background: 'rgba(239,68,68,0.15)',
+          color: C.brand,
+          border: '1px solid rgba(239,68,68,0.35)',
           marginBottom: 8,
           opacity: analysing || !settings.enabled || status !== 'connected' ? 0.45 : 1,
         }}
@@ -718,7 +718,7 @@ export default function Popup() {
                 height: '100%',
                 width: `${progress}%`,
                 borderRadius: 4,
-                background: `linear-gradient(90deg, ${C.violet} 0%, #a5b4fc 50%, ${C.violet} 100%)`,
+                background: `linear-gradient(90deg, ${C.brand} 0%, #f87171 50%, ${C.brand} 100%)`,
                 backgroundSize: '200% 100%',
                 animation: 'tgShimmer 1.4s linear infinite',
                 transition: 'width 0.28s ease-out',
@@ -774,7 +774,7 @@ export default function Popup() {
           style={{
             padding: '10px 12px',
             borderRadius: 8,
-            background: `rgba(${verdictColor === C.accent ? '16,185,129' : '99,102,241'},0.08)`,
+            background: `rgba(${verdictColor === C.green ? '16,185,129' : '99,102,241'},0.08)`,
             border: `1px solid ${verdictColor}40`,
             marginBottom: 8,
           }}
@@ -821,7 +821,7 @@ export default function Popup() {
             flexShrink: 0,
             background: 'none',
             border: 'none',
-            color: C.accent,
+            color: C.brand,
             fontSize: 10,
             cursor: 'pointer',
             padding: 0,

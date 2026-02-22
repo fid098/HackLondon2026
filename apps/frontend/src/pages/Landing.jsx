@@ -1,5 +1,5 @@
 /**
- * Landing.jsx — Home page shown when the Verify logo is clicked.
+ * Landing.jsx — Home page shown when the TruthGuard logo is clicked.
  *
  * DEVELOPER: Leena
  * ─────────────────────────────────────────────────────────────────────────────
@@ -13,381 +13,214 @@
  *
  * DESIGN SYSTEM NOTES
  * ────────────────────
- * - Background orbs: <div className="orb orb-green"> — see index.css .orb
- *   These are blurred radial gradients. Control size with width/height,
- *   position with top/left/right/bottom, intensity with opacity.
- * - Glassmorphism cards: background rgba(255,255,255,0.02) + backdropFilter blur
- * - Gradient headline text: className="gradient-text" — defined in index.css
+ * - Brand accent: #ef4444 (red) — used for CTAs, labels, hero gradient
+ * - Background shapes: Framer Motion parallax shapes on scroll
  * - Buttons: className="btn-primary" or "btn-secondary" — defined in index.css
- * - Section divider: className="section-divider" — defined in index.css
  *
  * SECTIONS IN ORDER
  * ──────────────────
- * 1. HERO          — headline, sub-headline, CTA buttons, tech pills, scroll indicator
- * 2. STATS BAR     — 4 highlight numbers
- * 3. FEATURE CARDS — three glassmorphism cards (AI Suite, Heatmap, Reports)
- * 4. PIPELINE      — "How It Works" 4-step flow diagram + model detail cards
- * 5. DISCLAIMER    — legal disclaimer text
+ * 1. HERO             — headline, sub-headline, CTA buttons
+ * 2. PROBLEM + SOLUTION
+ * 3. SDG / IMPACT CARDS
+ * 4. LOCAL GOVERNANCE / PHYSICAL TRUST
+ *
+ * WHAT TO IMPROVE (your tasks as Leena)
+ * ────────────────────────────────────────
+ * - Add a short demo GIF or screenshot above the fold (between sub-headline and CTAs).
+ * - Add a social proof section: "Built at HackLondon 2026 · X teams · Y participants".
+ * - Add a footer with links (GitHub repo, team info, license).
+ * - Make the tech pills clickable: scroll to the relevant section of the page.
+ * - Consider a "dark/light mode" toggle — would require CSS variable overrides.
  */
 
-/* ─── Feature cards data ──────────────────────────────────────────────────── */
-const FEATURES = [
-  {
-    icon:        '🤖',
-    title:       'AI Analysis Suite',
-    description: 'One tab for everything: fact-check claims with a multi-agent debate, detect deepfakes in images/audio/video, and scan for scams — all running in parallel.',
-    accent:      { color: '#818cf8', dim: 'rgba(99,102,241,0.07)', border: 'rgba(99,102,241,0.18)' },
-    tag:         'Core Feature',
-    page:        'analyze',
-    capabilities: ['Multi-agent debate', 'Deepfake detection', 'Scam scanner'],
-  },
-  {
-    icon:        '🌐',
-    title:       'Live Intelligence Map',
-    description: 'Real-time world map of misinformation hotspots powered by MongoDB geospatial queries, aggregation pipelines, and Change Streams for live dashboard updates.',
-    accent:      { color: '#38bdf8', dim: 'rgba(56,189,248,0.07)', border: 'rgba(56,189,248,0.18)' },
-    tag:         'Live Data',
-    page:        'heatmap',
-    capabilities: ['3D globe view', 'Narrative arcs', 'Hotspot tracking'],
-  },
-  {
-    icon:        '📊',
-    title:       'Report Archive',
-    description: 'Every analysis is persisted to MongoDB Atlas. Full-text search, vector similarity search for related claims, and PDF/JSON export for every report.',
-    accent:      { color: '#a78bfa', dim: 'rgba(167,139,250,0.07)', border: 'rgba(167,139,250,0.18)' },
-    tag:         'Persistent',
-    page:        'reports',
-    capabilities: ['Vector similarity', 'Full-text search', 'Export reports'],
-  },
-]
+import { motion, useScroll, useTransform } from 'framer-motion'
+import { useRef } from 'react'
 
-/* ─── Stats bar ──────────────────────────────────────────────────────────── */
-const STATS = [
-  { value: '3+',    label: 'AI Models',        color: '#818cf8' },
-  { value: '< 10s', label: 'Analysis Time',    color: '#38bdf8' },
-  { value: '4',     label: 'Detection Layers', color: '#a78bfa' },
-  { value: '24/7',  label: 'Live Monitoring',  color: '#34d399' },
-]
-
-/* ─── AI pipeline steps ──────────────────────────────────────────────────── */
-const PIPELINE_STEPS = [
-  { num: '01', label: 'Submit',  sub: 'URL, text, media', icon: '📎' },
-  { num: '02', label: 'Extract', sub: 'Claims identified', icon: '🔍' },
-  { num: '03', label: 'Debate',  sub: 'Pro vs Con agents', icon: '⚡' },
-  { num: '04', label: 'Verdict', sub: 'Judge synthesizes', icon: '✅' },
-]
-
-/* ─── Technology stack pills ─────────────────────────────────────────────── */
-const TECH_PILLS = [
-  'Gemini 1.5 Pro', 'MongoDB Atlas', 'Vector Search',
-  'Geospatial', 'Change Streams', 'FastAPI',
-]
-
-/* ─── Landing page component ─────────────────────────────────────────────── */
 export default function Landing({ onNavigate }) {
-  return (
-    <div className="relative overflow-x-hidden">
+  const containerRef = useRef(null)
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ['start start', 'end end'],
+  })
 
-      {/* ── Background orbs ── */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="orb orb-violet" style={{ width: 800, height: 800, top: '-20%', left: '-20%',  opacity: 0.10 }} />
-        <div className="orb orb-blue"   style={{ width: 650, height: 650, top: '35%',  right: '-18%', opacity: 0.09 }} />
-        <div className="orb orb-green"  style={{ width: 500, height: 500, bottom: '-12%', left: '25%', opacity: 0.07 }} />
+  /* Declare every parallax transform at the top level (Rules of Hooks) */
+  const y1 = useTransform(scrollYProgress, [0, 1], [0, -250])
+  const y2 = useTransform(scrollYProgress, [0, 1], [0, 200])
+  const y3 = useTransform(scrollYProgress, [0, 1], [0, -180])
+  const y4 = useTransform(scrollYProgress, [0, 1], [0, 150])
+  const y5 = useTransform(scrollYProgress, [0, 1], [0, -200])
+  const y6 = useTransform(scrollYProgress, [0, 1], [0, 250])
+  const shapeOpacity = useTransform(scrollYProgress, [0.7, 1], [1, 0])
+
+  return (
+    <div ref={containerRef} className="relative text-white" style={{ background: 'var(--bg-base)' }}>
+
+      {/* ── Floating shapes layer ── */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <motion.div style={{ y: y1, opacity: shapeOpacity }}
+          className="absolute top-10 left-[-8rem] w-96 h-96 rounded-full bg-red-700/20 blur-2xl" />
+        <motion.div style={{ y: y2, opacity: shapeOpacity }}
+          className="absolute top-[40vh] right-[-10rem] w-80 h-80 rounded-full bg-red-500/15 blur-3xl" />
+        <motion.div style={{ y: y3, opacity: shapeOpacity }}
+          className="absolute bottom-[5vh] left-1/4 w-72 h-72 rounded-full bg-red-900/20 blur-2xl" />
+        <motion.div style={{ y: y4, opacity: shapeOpacity }}
+          className="absolute top-[25vh] left-1/2 w-64 h-64 rounded-full bg-red-600/20 blur-2xl" />
+        <motion.div style={{ y: y5, opacity: shapeOpacity }}
+          className="absolute top-[10vh] right-1/3 w-80 h-80 rounded-full bg-red-700/15 blur-2xl" />
+        <motion.div style={{ y: y6, opacity: shapeOpacity }}
+          className="absolute bottom-[10vh] right-1/3 w-72 h-72 rounded-full bg-red-800/20 blur-2xl" />
       </div>
 
-      {/* Subtle grid overlay */}
-      <div
-        className="pointer-events-none fixed inset-0"
-        style={{
-          backgroundImage: 'linear-gradient(rgba(99,102,241,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.03) 1px, transparent 1px)',
-          backgroundSize: '60px 60px',
-        }}
-      />
+      {/* ── Main content ── */}
+      <div className="relative z-10">
 
-      <div className="relative max-w-7xl mx-auto px-5">
-
-        {/* ══════════════════ HERO SECTION ══════════════════ */}
-        <section className="min-h-[90vh] flex flex-col items-center justify-center text-center py-24 gap-7">
-
-          {/* Live badge */}
-          <div
-            className="inline-flex items-center gap-2.5 px-5 py-2 rounded-full text-sm font-medium"
-            style={{
-              background: 'rgba(99,102,241,0.08)',
-              border: '1px solid rgba(99,102,241,0.22)',
-              color: '#a5b4fc',
-            }}
-          >
-            <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse shrink-0" />
-            Built for HackLondon 2026 · Powered by Gemini 1.5 Pro
-          </div>
-
-          {/* Hero heading */}
-          <h1 className="text-6xl md:text-7xl lg:text-[88px] font-extrabold tracking-tighter leading-[1.03] max-w-4xl">
-            <span style={{ color: '#f1f5f9' }}>Detect</span>{' '}
-            <span
-              style={{
-                background: 'linear-gradient(135deg, #818cf8, #38bdf8)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-              }}
-            >
-              Misinformation
-            </span>
-            <br />
-            <span style={{ color: '#f1f5f9' }}>Before It </span>
-            <span style={{ color: '#334155' }}>Spreads</span>
-          </h1>
-
-          {/* Sub-headline */}
-          <p className="text-xl text-slate-400 max-w-2xl leading-relaxed">
-            Verify uses multi-agent AI debates, deepfake detection, and real-time
-            geospatial intelligence to help you navigate the information landscape with confidence.
-          </p>
-
-          {/* CTA buttons */}
-          <div className="flex flex-wrap items-center justify-center gap-4 pt-1">
-            <button
-              onClick={() => onNavigate('analyze')}
-              className="text-base px-9 py-4 rounded-xl font-semibold transition-all duration-200"
-              style={{
-                background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
-                color: 'white',
-                boxShadow: '0 0 0 0 rgba(99,102,241,0)',
-                border: '1px solid rgba(99,102,241,0.4)',
-                transition: 'box-shadow 0.2s, transform 0.2s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = '0 0 28px rgba(99,102,241,0.45)'
-                e.currentTarget.style.transform = 'translateY(-1px)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = '0 0 0 0 rgba(99,102,241,0)'
-                e.currentTarget.style.transform = 'translateY(0)'
-              }}
-            >
-              Start Analysing →
-            </button>
-            <button
-              onClick={() => onNavigate('heatmap')}
-              className="text-base px-9 py-4 rounded-xl font-semibold transition-all duration-200 text-slate-300 hover:text-white"
-              style={{
-                background: 'rgba(255,255,255,0.04)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                transition: 'background 0.2s, border-color 0.2s, transform 0.2s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.07)'
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'
-                e.currentTarget.style.transform = 'translateY(-1px)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'
-                e.currentTarget.style.transform = 'translateY(0)'
-              }}
-            >
-              View Live Heatmap
-            </button>
-          </div>
-
-          {/* Technology stack pills */}
-          <div className="flex flex-wrap justify-center gap-2 pt-2">
-            {TECH_PILLS.map((p) => (
-              <span
-                key={p}
-                className="text-xs font-mono text-slate-600 px-3 py-1 rounded-full"
-                style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}
+        {/* ══════════════════ HERO ══════════════════ */}
+        <section className="pt-24 pb-16 md:pt-32 md:pb-20 flex flex-col justify-center px-6 md:px-16">
+          <div className="max-w-6xl mx-auto w-full">
+            <h1 className="leading-none font-extrabold">
+              <span className="block text-white text-4xl md:text-6xl lg:text-7xl">REALITY</span>
+              <span className="block text-red-600  text-4xl md:text-6xl lg:text-7xl">CAN BE</span>
+              <span className="block text-red-700  text-4xl md:text-6xl lg:text-7xl">FABRICATED.</span>
+            </h1>
+            <p className="mt-8 max-w-2xl text-gray-400 text-base md:text-lg">
+              Deepfake officials. Forged planning notices. Synthetic infrastructure
+              failures. In smart cities, misinformation becomes physical risk.
+            </p>
+            <div className="mt-10 flex flex-col sm:flex-row gap-4">
+              <button
+                onClick={() => onNavigate('analyze')}
+                className="bg-gradient-to-r from-red-500 to-red-700 hover:scale-105 transition-transform px-8 py-3 rounded-md font-medium"
               >
-                {p}
-              </span>
-            ))}
+                Launch Verification →
+              </button>
+              <button
+                onClick={() => onNavigate('heatmap')}
+                className="border border-gray-600 hover:border-red-500 transition-colors px-8 py-3 rounded-md text-gray-300"
+              >
+                View Global Heatmap
+              </button>
+            </div>
           </div>
+        </section>
 
-          {/* Scroll indicator */}
-          <div className="pt-8 flex flex-col items-center gap-2 text-slate-700">
-            <span className="text-xs tracking-widest uppercase">Scroll to explore</span>
-            <div
-              className="w-0.5 h-10 rounded-full"
-              style={{ background: 'linear-gradient(to bottom, rgba(99,102,241,0.5), transparent)' }}
+        {/* ══════════════════ PROBLEM + SOLUTION ══════════════════ */}
+        <Section>
+          <div className="grid md:grid-cols-2 gap-10 items-center">
+            <div>
+              <h2 className="text-3xl md:text-5xl font-bold mb-6">
+                The Next Infrastructure Threat
+              </h2>
+              <p className="text-gray-400 mb-4">
+                Hyper-realistic AI-generated media — deepfakes, synthetic voices, falsified images —
+                is spreading faster than detection tools. Truth is no longer self-evident.
+              </p>
+              <ul className="list-disc list-inside text-gray-400 space-y-2">
+                <li>Election interference &amp; social instability</li>
+                <li>Impossible to distinguish real vs AI-generated media</li>
+                <li>Real-time verification needed for autonomous agents &amp; civic trust</li>
+              </ul>
+            </div>
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              className="p-6 rounded-xl border"
+              style={{ background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.1)' }}
+            >
+              <h3 className="text-red-400 font-semibold text-lg mb-2">Shadow Planning</h3>
+              <p className="text-gray-300">
+                Fake digital notices can manipulate property prices, creating chaos in local governance.
+              </p>
+            </motion.div>
+          </div>
+        </Section>
+
+        {/* ══════════════════ SDG / IMPACT CARDS ══════════════════ */}
+        <Section>
+          <h2 className="text-3xl md:text-5xl font-bold mb-6">Protecting People &amp; Cities</h2>
+          <div className="grid md:grid-cols-2 gap-6 max-w-4xl">
+            <ImpactCard
+              goal="Goal 3: Health &amp; Wellbeing"
+              description="Fake medical scans &amp; insurance claims are flagged to reduce misinformation."
+            />
+            <ImpactCard
+              goal="Goal 4: Quality Education"
+              description="AI-generated certificates verified to prevent fraud."
+            />
+            <ImpactCard
+              goal="Goal 8: Work &amp; Economic Growth"
+              description="False claims evidence is validated to protect employers &amp; insurers."
+            />
+            <ImpactCard
+              goal="Goal 16: Justice &amp; Government"
+              description="Falsified statistics and climate denial misinformation are identified to protect democracy."
             />
           </div>
-        </section>
+        </Section>
 
-        {/* ══════════════════ STATS BAR ══════════════════ */}
-        <section className="pb-20">
-          <div
-            className="grid grid-cols-2 md:grid-cols-4 gap-4 rounded-2xl p-1"
-            style={{
-              background: 'rgba(255,255,255,0.02)',
-              border: '1px solid rgba(255,255,255,0.07)',
-            }}
-          >
-            {STATS.map((s) => (
-              <div
-                key={s.label}
-                className="flex flex-col items-center justify-center py-7 rounded-xl"
-                style={{ background: 'rgba(255,255,255,0.015)' }}
-              >
-                <span
-                  className="text-4xl font-extrabold tracking-tight mb-1"
-                  style={{ color: s.color }}
-                >
-                  {s.value}
-                </span>
-                <span className="text-xs text-slate-600 uppercase tracking-widest font-medium">
-                  {s.label}
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ══════════════════ FEATURE CARDS SECTION ══════════════════ */}
-        <section className="pb-24">
-          <div className="text-center mb-14">
-            <p
-              className="text-xs uppercase tracking-[3px] font-semibold mb-3"
-              style={{ color: '#818cf8' }}
-            >
-              Platform Features
-            </p>
-            <h2 className="text-4xl font-bold text-white mb-3">Three layers of truth</h2>
-            <p className="text-slate-500">AI-powered detection at every level</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {FEATURES.map((f, i) => (
-              <div
-                key={f.title}
-                className="relative rounded-2xl p-7 cursor-pointer overflow-hidden flex flex-col"
-                style={{
-                  background:     f.accent.dim,
-                  border:         `1px solid ${f.accent.border}`,
-                  backdropFilter: 'blur(14px)',
-                  transition:     'transform 0.25s, box-shadow 0.25s',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform  = 'translateY(-6px)'
-                  e.currentTarget.style.boxShadow  = `0 24px 60px ${f.accent.dim}`
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform  = 'translateY(0)'
-                  e.currentTarget.style.boxShadow  = 'none'
-                }}
-                onClick={() => onNavigate(f.page)}
-              >
-                {/* Large number watermark */}
-                <div
-                  className="absolute top-4 right-6 text-7xl font-black select-none pointer-events-none"
-                  style={{ color: f.accent.border, lineHeight: 1 }}
-                >
-                  0{i + 1}
-                </div>
-
-                <div className="flex items-start justify-between mb-6">
-                  <span className="text-4xl">{f.icon}</span>
-                  <span
-                    className="text-xs font-medium px-2.5 py-1 rounded-full"
-                    style={{ background: 'rgba(255,255,255,0.05)', color: '#64748b', border: '1px solid rgba(255,255,255,0.08)' }}
-                  >
-                    {f.tag}
-                  </span>
-                </div>
-
-                <h3 className="text-xl font-bold text-white mb-2">{f.title}</h3>
-                <p className="text-slate-400 text-sm leading-relaxed flex-1">{f.description}</p>
-
-                {/* Capability bullets */}
-                <div className="mt-5 flex flex-col gap-1.5">
-                  {f.capabilities.map((cap) => (
-                    <div key={cap} className="flex items-center gap-2">
-                      <span
-                        className="w-1.5 h-1.5 rounded-full shrink-0"
-                        style={{ background: f.accent.color }}
-                      />
-                      <span className="text-xs text-slate-500">{cap}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-6 flex items-center gap-2 text-[13px] font-semibold" style={{ color: f.accent.color }}>
-                  Explore →
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ══════════════════ PIPELINE SECTION ══════════════════ */}
-        <section className="pb-24">
-          <div
-            className="rounded-2xl p-10 md:p-14"
-            style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}
-          >
-            <div className="text-center mb-12">
-              <p className="text-xs uppercase tracking-[3px] font-semibold mb-3" style={{ color: '#818cf8' }}>
-                How It Works
+        {/* ══════════════════ LOCAL GOVERNANCE / PHYSICAL TRUST ══════════════════ */}
+        <Section>
+          <h2 className="text-3xl md:text-5xl font-bold mb-6">
+            Physical Trust &amp; Local Governance
+          </h2>
+          <div className="grid md:grid-cols-2 gap-10 items-center">
+            <div className="space-y-4">
+              <p className="text-gray-400">
+                Everything — from planning notices to mayoral announcements — could be faked.
+                TruthGuard distinguishes between "Flagged as Fake" and "Unauthenticated".
               </p>
-              <h3 className="text-3xl font-bold text-white">The AI Debate Pipeline</h3>
-              <p className="text-slate-600 text-sm mt-2">Four stages from submission to verified verdict</p>
+              <ul className="list-disc list-inside text-gray-400 space-y-2">
+                <li>Fabricated infrastructure failures: fake bridge collapses</li>
+                <li>Shadow planning affecting property markets</li>
+                <li>Liar's dividend: scandals denied via AI excuses</li>
+                <li>Physical Reality Anchors: QR codes verify real-world locations</li>
+              </ul>
             </div>
-
-            {/* Steps row */}
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              {PIPELINE_STEPS.map((step, i) => (
-                <div key={step.num} className="flex items-center gap-3">
-                  <div className="text-center">
-                    <div
-                      className="w-16 h-16 rounded-2xl flex flex-col items-center justify-center mx-auto mb-3 relative"
-                      style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)' }}
-                    >
-                      <span className="text-lg mb-0.5">{step.icon}</span>
-                      <span className="text-indigo-400 font-bold text-[10px] opacity-60">{step.num}</span>
-                    </div>
-                    <div className="text-white font-semibold text-sm">{step.label}</div>
-                    <div className="text-slate-600 text-xs mt-0.5">{step.sub}</div>
-                  </div>
-                  {/* Arrow connector */}
-                  {i < PIPELINE_STEPS.length - 1 && (
-                    <div className="text-slate-700 text-xl font-light mb-6 hidden md:block">→</div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Model cards */}
-            <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-              {[
-                { model: 'Gemini Flash',   role: 'Quick triage · Chrome extension',           color: '#818cf8' },
-                { model: 'Gemini 1.5 Pro', role: 'Deep analysis · Agent debate · Multimodal', color: '#38bdf8' },
-                { model: 'MongoDB Atlas',  role: 'Vector search · Geo · Change Streams',      color: '#a78bfa' },
-              ].map((m) => (
-                <div
-                  key={m.model}
-                  className="rounded-xl p-5"
-                  style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}
-                >
-                  <div className="font-mono font-bold mb-1" style={{ color: m.color }}>{m.model}</div>
-                  <div className="text-xs text-slate-600">{m.role}</div>
-                </div>
-              ))}
-            </div>
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              className="p-6 rounded-xl border"
+              style={{ background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.1)' }}
+            >
+              <h3 className="text-red-400 font-semibold text-lg mb-2">Future-Proof Civic Trust</h3>
+              <p className="text-gray-300">
+                Interactive verification ensures all citizens can trust critical information,
+                even in smart cities.
+              </p>
+            </motion.div>
           </div>
-        </section>
+        </Section>
 
-        {/* ══════════════════ DISCLAIMER SECTION ══════════════════ */}
-        <section className="pb-16 text-center">
-          <div className="section-divider" />
-          <p className="text-xs text-slate-700 max-w-lg mx-auto mt-8 leading-relaxed">
-            Verify provides <em>probabilistic assessments only</em> and is not guaranteed to
-            be accurate. Results should not be the sole basis for any decision. Always verify
-            with primary sources and consult professionals where appropriate.
-          </p>
-        </section>
+        {/* ══════════════════ BOTTOM PADDING ══════════════════ */}
+        <div className="h-16" />
 
       </div>
     </div>
+  )
+}
+
+/* ─── Section wrapper with scroll-triggered fade-in ─────────────────────── */
+function Section({ children }) {
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 80 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.8 }}
+      viewport={{ once: true, amount: 0.3 }}
+      className="py-16 md:py-20 px-6 md:px-16 relative z-10"
+    >
+      <div className="max-w-6xl mx-auto w-full space-y-8">{children}</div>
+    </motion.section>
+  )
+}
+
+/* ─── SDG impact card ────────────────────────────────────────────────────── */
+function ImpactCard({ goal, description }) {
+  return (
+    <motion.div
+      whileHover={{ scale: 1.05 }}
+      className="p-6 rounded-xl border transition-transform"
+      style={{ background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.1)' }}
+    >
+      <h3 className="text-red-400 font-semibold text-lg mb-2">{goal}</h3>
+      <p className="text-gray-300 text-base">{description}</p>
+    </motion.div>
   )
 }

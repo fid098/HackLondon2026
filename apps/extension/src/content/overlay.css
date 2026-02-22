@@ -17,7 +17,7 @@
   border-radius: 20px;
   font-size: 11px;
   font-weight: 600;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   cursor: default;
@@ -35,7 +35,8 @@
 .tg-verdict-misleading { background: rgba(245,158,11,0.15);  color: #f59e0b; border: 1px solid rgba(245,158,11,0.35);  }
 .tg-verdict-satire     { background: rgba(139,92,246,0.15);  color: #8b5cf6; border: 1px solid rgba(139,92,246,0.35);  }
 .tg-verdict-unverified { background: rgba(99,102,241,0.15);  color: #6366f1; border: 1px solid rgba(99,102,241,0.35);  }
-.tg-verdict-true       { background: rgba(16,185,129,0.15);  color: #10b981; border: 1px solid rgba(16,185,129,0.35);  }
+.tg-verdict-true         { background: rgba(16,185,129,0.15);  color: #10b981; border: 1px solid rgba(16,185,129,0.35);  }
+.tg-verdict-ai_generated { background: rgba(249,115,22,0.15);  color: #f97316; border: 1px solid rgba(249,115,22,0.35);  }
 
 /* Video deepfake warning badge (non-disruptive overlay). */
 .tg-video-container {
@@ -74,10 +75,10 @@
   padding: 7px 12px;
   border-radius: 8px;
   font-size: 12px;
-  font-family: system-ui, -apple-system, sans-serif;
-  background: rgba(15, 23, 42, 0.97);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: rgba(4, 4, 10, 0.97);
   color: #f1f5f9;
-  border: 1px solid rgba(99, 102, 241, 0.45);
+  border: 1px solid rgba(239, 68, 68, 0.4);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
   white-space: nowrap;
   pointer-events: auto;
@@ -94,15 +95,15 @@
   border-radius: 5px;
   font-size: 11px;
   font-weight: 600;
-  background: rgba(99, 102, 241, 0.2);
-  color: #818cf8;
-  border: 1px solid rgba(99, 102, 241, 0.35);
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.35);
   cursor: pointer;
   transition: background 0.12s;
 }
 
 .tg-tooltip-btn:hover {
-  background: rgba(99, 102, 241, 0.38);
+  background: rgba(239, 68, 68, 0.35);
 }
 
 /* ── Result banner (shown after "Check" click) ───────────────────────────────── */
@@ -116,11 +117,11 @@
   max-width: 360px;
   padding: 12px 14px;
   border-radius: 10px;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   font-size: 12px;
-  background: rgba(15, 23, 42, 0.97);
+  background: rgba(4, 4, 10, 0.97);
   color: #f1f5f9;
-  border: 1px solid rgba(99, 102, 241, 0.35);
+  border: 1px solid rgba(239, 68, 68, 0.3);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   animation: tg-fade-in 0.2s ease-out both;
 }
