@@ -186,7 +186,7 @@ function ScoreBar({ label, value, color }) {
 
 /* ─── result cards ────────────────────────────────────────────────────────────── */
 
-function FactCard({ result, onSave }) {
+function FactCard({ result, onSave, saveState, onNavigate }) {
   const vs = VERDICT_STYLES[result.verdict] ?? VERDICT_STYLES.UNVERIFIED
   return (
     <div className="rounded-2xl p-6 flex flex-col gap-5"
@@ -240,10 +240,38 @@ function FactCard({ result, onSave }) {
         </div>
       )}
 
-      <button onClick={onSave}
-        className="btn-secondary text-xs px-4 py-2 flex items-center gap-1.5 self-start">
-        💾 Save to Reports
-      </button>
+      {/* ── Save prompt ── */}
+      <div className="flex items-center gap-3 flex-wrap pt-1 border-t border-white/5">
+        {saveState === 'saved' ? (
+          <>
+            <span className="text-xs text-emerald-400 flex items-center gap-1.5">
+              ✓ Saved to archive
+            </span>
+            {onNavigate && (
+              <button
+                onClick={() => onNavigate('reports')}
+                className="text-xs text-violet-400 hover:text-violet-300 transition-colors underline underline-offset-2"
+              >
+                View Reports →
+              </button>
+            )}
+          </>
+        ) : (
+          <button
+            onClick={onSave}
+            disabled={saveState === 'saving'}
+            className="btn-secondary text-xs px-4 py-2 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saveState === 'saving' ? (
+              <><span className="spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} /> Saving…</>
+            ) : saveState === 'error' ? (
+              '⚠ Retry Save'
+            ) : (
+              '💾 Save to Reports'
+            )}
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -362,7 +390,7 @@ function DeepfakeCard({ result, mediaKind }) {
 
 /* ─── main component ─────────────────────────────────────────────────────────── */
 
-export default function Analyze() {
+export default function Analyze({ onNavigate }) {
   const [tab,           setTab]           = useState('url')
   const [url,           setUrl]           = useState('')
   const [text,          setText]          = useState('')
@@ -375,13 +403,14 @@ export default function Analyze() {
   const [deepfakeResult, setDeepfakeResult] = useState(null)
   const [mediaKind,     setMediaKind]     = useState(null)
   const [feedback,      setFeedback]      = useState(null)
+  const [saveState,     setSaveState]     = useState('idle') // 'idle' | 'saving' | 'saved' | 'error'
   const fileRef = useRef(null)
 
   // Reset all result state. Called before each new analysis and when switching tabs.
   // Not resetting before a new analysis would cause stale results to flash briefly.
   const clearResults = () => {
     setFactResult(null); setScamResult(null); setDeepfakeResult(null)
-    setMediaKind(null); setFeedback(null); setError(null)
+    setMediaKind(null); setFeedback(null); setError(null); setSaveState('idle')
   }
 
   /* ── file selection ── */
@@ -473,7 +502,8 @@ export default function Analyze() {
 
   /* ── save report ── */
   const handleSave = async () => {
-    if (!factResult) return
+    if (!factResult || saveState === 'saving' || saveState === 'saved') return
+    setSaveState('saving')
     try {
       await saveReport({
         source_type: factResult.source_type ?? tab,
@@ -486,7 +516,10 @@ export default function Analyze() {
         sources:     factResult.sources ?? [],
         category:    factResult.category ?? 'General',
       })
-    } catch (_) { /* silently ignore */ }
+      setSaveState('saved')
+    } catch (_) {
+      setSaveState('error')
+    }
   }
 
   /* ── scam feedback ── */
@@ -656,7 +689,7 @@ export default function Analyze() {
           {/* Text/URL: two-column grid */}
           {factResult && scamResult && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              <FactCard result={factResult} onSave={handleSave} />
+              <FactCard result={factResult} onSave={handleSave} saveState={saveState} onNavigate={onNavigate} />
               <ScamCard result={scamResult} feedback={feedback} onFeedback={handleFeedback} />
             </div>
           )}
