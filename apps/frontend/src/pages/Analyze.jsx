@@ -155,9 +155,9 @@ function Tab({ id, label, icon, active, onClick }) {
     <button
       onClick={() => onClick(id)}
       className={['flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 focus:outline-none',
-        active ? 'text-emerald-400' : 'text-slate-500 hover:text-slate-300'].join(' ')}
+        active ? 'text-red-400' : 'text-slate-500 hover:text-slate-300'].join(' ')}
       style={active
-        ? { background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)' }
+        ? { background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)' }
         : { background: 'transparent', border: '1px solid transparent' }}
     >
       <span>{icon}</span>{label}
@@ -245,7 +245,7 @@ function FactCard({ result, onSave }) {
           <p className="text-xs text-slate-600 uppercase tracking-widest mb-2">Sources</p>
           {result.sources.map((s, i) => (
             <a key={i} href={s.url} target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-2 text-xs text-slate-500 hover:text-emerald-400 transition-colors mb-1">
+              className="flex items-center gap-2 text-xs text-slate-500 hover:text-red-400 transition-colors mb-1">
               <span className="text-slate-700 font-mono shrink-0">[{i + 1}]</span>{s.title}
               <span className="text-slate-700">↗</span>
             </a>
@@ -840,15 +840,17 @@ export default function Analyze() {
   return (
     <div className="relative max-w-5xl mx-auto px-5 py-14">
 
-      {/* ── Background orbs ── */}
+      {/* ── Background shapes ── */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden>
-        <div className="orb orb-green"  style={{ width: 500, height: 500, top: '-10%',  left: '-10%',  opacity: 0.09 }} />
-        <div className="orb orb-violet" style={{ width: 400, height: 400, bottom: '5%', right: '-15%', opacity: 0.07 }} />
+        <div className="absolute rounded-full blur-3xl" style={{ width: 520, height: 520, top: '-12%', left: '-12%', background: 'radial-gradient(circle, rgba(239,68,68,0.22), transparent 70%)' }} />
+        <div className="absolute blur-3xl" style={{ width: 420, height: 280, top: '35%', right: '-8%', borderRadius: '60% 40% 40% 60% / 50% 60% 40% 50%', background: 'radial-gradient(circle, rgba(185,28,28,0.18), transparent 70%)' }} />
+        <div className="absolute rounded-full blur-2xl" style={{ width: 280, height: 280, bottom: '8%', left: '25%', background: 'radial-gradient(circle, rgba(239,68,68,0.14), transparent 70%)' }} />
+        <div className="absolute blur-3xl" style={{ width: 320, height: 200, top: '60%', left: '-5%', borderRadius: '40% 60%', background: 'radial-gradient(circle, rgba(220,38,38,0.12), transparent 70%)' }} />
       </div>
 
       {/* ── Page header ── */}
       <div className="mb-10">
-        <p className="text-xs text-emerald-500 uppercase tracking-[3px] font-semibold mb-3">
+        <p className="text-xs text-red-500 uppercase tracking-[3px] font-semibold mb-3">
           AI Analysis Suite
         </p>
         <h1 className="text-4xl font-extrabold text-white mb-2">Analyze Content</h1>
@@ -906,7 +908,7 @@ export default function Analyze() {
               rows={7} className="input-field w-full resize-none" style={{ lineHeight: 1.6 }} />
             <div className="flex justify-between text-xs">
               <span className="text-slate-600">Minimum 20 characters</span>
-              <span className={text.length < 20 ? 'text-slate-600' : 'text-emerald-500'}>
+              <span className={text.length < 20 ? 'text-slate-600' : 'text-red-500'}>
                 {text.length.toLocaleString()} chars
               </span>
             </div>
@@ -921,8 +923,8 @@ export default function Analyze() {
               onDrop={onDrop} onClick={() => fileRef.current?.click()}
               className="rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-3 py-12 cursor-pointer transition-all duration-200"
               style={{
-                borderColor: dragOver ? 'rgba(16,185,129,0.6)' : 'rgba(255,255,255,0.1)',
-                background:  dragOver ? 'rgba(16,185,129,0.05)' : 'rgba(255,255,255,0.01)',
+                borderColor: dragOver ? 'rgba(239,68,68,0.6)' : 'rgba(255,255,255,0.1)',
+                background:  dragOver ? 'rgba(239,68,68,0.05)' : 'rgba(255,255,255,0.01)',
               }}>
               <span className="text-4xl select-none">{mediaFile ? (kindIcon[kind] ?? '📁') : '📂'}</span>
               {mediaFile ? (
@@ -1031,11 +1033,6 @@ export default function Analyze() {
         </div>
       )}
 
-      {/* ── Disclaimer ── */}
-      <p className="text-center text-xs text-slate-700 mt-10 max-w-xl mx-auto leading-relaxed">
-        TruthGuard provides <em>probabilistic assessments only</em>. Results should not be
-        the sole basis for any decision. Always verify with primary sources.
-      </p>
     </div>
   )
 }

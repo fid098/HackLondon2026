@@ -258,6 +258,39 @@ def _mock_article_response(url: str, title: str) -> TriageResponse:
     )
 
 
+# Valid verdict set — the extension's VERDICT_COLORS and overlay.css only
+# handle these exact strings. Anything else must be normalised before returning.
+_VALID_VERDICTS = {"TRUE", "FALSE", "MISLEADING", "AI_GENERATED", "UNVERIFIED", "SATIRE"}
+
+# Maps Gemini verdict synonyms → canonical verdict.
+# Gemini sometimes writes "UNVERIFIABLE", "UNCERTAIN", "UNDETERMINED", etc.
+_VERDICT_ALIASES: dict[str, str] = {
+    "unverified":    "UNVERIFIED",
+    "unverifiable":  "UNVERIFIED",
+    "uncertain":     "UNVERIFIED",
+    "undetermined":  "UNVERIFIED",
+    "inconclusive":  "UNVERIFIED",
+    "unknown":       "UNVERIFIED",
+    "true":          "TRUE",
+    "false":         "FALSE",
+    "misleading":    "MISLEADING",
+    "misinformation":"MISLEADING",
+    "inaccurate":    "MISLEADING",
+    "ai_generated":  "AI_GENERATED",
+    "ai generated":  "AI_GENERATED",
+    "satire":        "SATIRE",
+    "satirical":     "SATIRE",
+}
+
+
+def _normalise_verdict(raw: str) -> str:
+    """Coerce any Gemini verdict string to one of the six canonical values."""
+    upper = raw.strip().upper()
+    if upper in _VALID_VERDICTS:
+        return upper
+    return _VERDICT_ALIASES.get(raw.strip().lower(), "UNVERIFIED")
+
+
 # Maps Gemini label synonyms → our canonical three labels.
 # Gemini sometimes writes "hallucinated", "fabricated", "factual", etc.
 _LABEL_ALIASES: dict[str, str] = {
@@ -305,7 +338,7 @@ def _parse_response(raw: str) -> TriageResponse | None:
                             label=label,
                         ))
             return TriageResponse(
-                verdict=str(data.get("verdict", "UNVERIFIED")).upper(),
+                verdict=_normalise_verdict(str(data.get("verdict", "UNVERIFIED"))),
                 confidence=max(0, min(100, int(data.get("confidence", 30)))),
                 summary=str(data.get("summary", "Triage complete.")),
                 highlights=highlights,

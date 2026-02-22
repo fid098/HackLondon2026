@@ -16,8 +16,14 @@ reference them in generate() calls via the response_key parameter.
 """
 
 import logging
+import os
 from enum import Enum
 from typing import Any
+
+# Python 3.14 + protobuf native extension can fail when importing Gemini deps.
+# Keep this as default-only so users can still override it explicitly.
+os.environ.setdefault("PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION", "python")
+
 import google.generativeai as genai
 
 from app.core.config import settings
