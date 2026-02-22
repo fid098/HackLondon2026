@@ -229,17 +229,21 @@ export function openIntelStream(onMessage, { forceMock = false } = {}) {
   }
 
   try {
-    // Attempt real WebSocket — openHeatmapStream returns a WebSocket instance
     const ws = openHeatmapStream(onMessage)
 
-    // If the connection fails immediately (e.g. backend down), onerror fires
+    // Track the mock fallback stream so we can close it if the WS errors
+    let mockStream = null
     ws.onerror = () => {
-      // Silently fall back — the caller has already registered onMessage
-      // which will now receive mock frames
-      _openMockStream(onMessage)
+      ws.close()
+      mockStream = _openMockStream(onMessage)
     }
 
-    return { close: () => ws.close() }
+    return {
+      close() {
+        ws.close()
+        mockStream?.close()
+      },
+    }
   } catch (_) {
     return _openMockStream(onMessage)
   }

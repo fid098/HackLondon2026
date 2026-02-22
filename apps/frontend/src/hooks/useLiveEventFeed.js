@@ -14,7 +14,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react'
-import { openHeatmapStream } from '../lib/api'
+import { openIntelStream } from '../lib/intelligenceProvider'
 
 const FEED_ITEMS = [
   'New event detected · Health · Jakarta',
@@ -46,45 +46,24 @@ export function useLiveEventFeed() {
   const wsRef = useRef(null)
 
   useEffect(() => {
-    let fallbackId
-    try {
-      const ws = openHeatmapStream((msg) => {
-        if (msg.message) setLiveFeed(msg.message)
-        if (msg.delta)   setTotalEvents(n => n + msg.delta)
-        if (msg.message) {
-          setFeedHistory(prev => [...prev, {
-            id:       Date.now(),
-            time:     new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-            msg:      msg.message,
-            city:     msg.city     ?? '—',
-            category: msg.category ?? 'Unknown',
-            sev:      msg.severity ?? 'medium',
-          }].slice(-200))
-        }
-      })
-      wsRef.current = ws
-    } catch {
-      let idx = 0
-      fallbackId = setInterval(() => {
-        idx = (idx + 1) % FEED_ITEMS.length
-        const raw   = FEED_ITEMS[idx]
-        const parts = raw.split(' · ')
-        setLiveFeed(raw)
-        setTotalEvents(n => n + Math.floor(Math.random() * 8))
+    // openIntelStream handles backend WS + automatic mock fallback internally.
+    // The returned { close() } interface is uniform regardless of which path is used.
+    const stream = openIntelStream((msg) => {
+      if (msg.message) setLiveFeed(msg.message)
+      if (msg.delta)   setTotalEvents(n => n + msg.delta)
+      if (msg.message) {
         setFeedHistory(prev => [...prev, {
           id:       Date.now(),
           time:     new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-          msg:      parts[0] ?? raw,
-          city:     parts[2] ?? '—',
-          category: parts[1] ?? 'Unknown',
-          sev:      raw.includes('Spike') || raw.includes('FALSE') || raw.includes('alert') ? 'high' : 'medium',
+          msg:      msg.message,
+          city:     msg.city     ?? '—',
+          category: msg.category ?? 'Unknown',
+          sev:      msg.severity ?? 'medium',
         }].slice(-200))
-      }, 3000)
-    }
-    return () => {
-      wsRef.current?.close()
-      if (fallbackId) clearInterval(fallbackId)
-    }
+      }
+    })
+    wsRef.current = stream
+    return () => wsRef.current?.close()
   }, [])
 
   return { liveFeed, feedHistory, totalEvents, autoScroll, setAutoScroll }

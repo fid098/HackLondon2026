@@ -116,11 +116,33 @@ class HeatmapResponse(BaseModel):
     total_events: int
 
 
+class SimulateRequest(BaseModel):
+    """Request body for POST /api/v1/heatmap/simulate."""
+    hotspot_label:      Optional[str] = None
+    category:           Optional[str] = None
+    time_horizon_hours: int           = 48
+
+
+class SpreadCity(BaseModel):
+    """A projected spread city returned by the simulation."""
+    city:           str
+    projectedCount: int
+
+
+class SimulateResponse(BaseModel):
+    """Response shape for POST /api/v1/heatmap/simulate."""
+    confidence:       float
+    model:            str
+    projected_spread: list[SpreadCity]
+
+
 class StreamEvent(BaseModel):
     """Single frame pushed over the WebSocket stream."""
 
-    type: str             # "event"
-    message: str          # human-readable feed entry
-    delta: int            # count increment since last frame
-    timestamp: str        # ISO-8601
-    severity: Optional[str] = None  # "high" | "medium" | "low" — for colour-coding ticker items
+    type:      str            # "event"
+    message:   str            # human-readable feed entry
+    delta:     int            # count increment since last frame
+    timestamp: str            # ISO-8601
+    severity:  Optional[str] = None   # "high" | "medium" | "low"
+    city:      Optional[str] = None   # originating city label
+    category:  Optional[str] = None   # narrative category

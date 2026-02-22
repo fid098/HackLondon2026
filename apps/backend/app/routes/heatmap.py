@@ -81,6 +81,9 @@ from app.models.heatmap import (
     HeatmapResponse,
     NarrativeItem,
     RegionStats,
+    SimulateRequest,
+    SimulateResponse,
+    SpreadCity,
 )
 from app.services.stability_scorer import assess_event, assess_region
 
@@ -105,19 +108,32 @@ router = APIRouter(prefix="/api/v1/heatmap", tags=["heatmap"])
 #   category   — used for the category filter pills in the UI
 
 _EVENTS: list[HeatmapEvent] = [
-    HeatmapEvent(cx=22,  cy=38,  label="New York",    count=312, severity="high",   category="Health"),
-    HeatmapEvent(cx=16,  cy=43,  label="Los Angeles", count=198, severity="medium", category="Politics"),
-    HeatmapEvent(cx=47,  cy=32,  label="London",      count=245, severity="high",   category="Health"),
-    HeatmapEvent(cx=49,  cy=30,  label="Berlin",      count=134, severity="medium", category="Climate"),
-    HeatmapEvent(cx=53,  cy=33,  label="Moscow",      count=389, severity="high",   category="Politics"),
-    HeatmapEvent(cx=72,  cy=38,  label="Beijing",     count=521, severity="high",   category="Science"),
-    HeatmapEvent(cx=76,  cy=44,  label="Tokyo",       count=287, severity="medium", category="Finance"),
-    HeatmapEvent(cx=70,  cy=50,  label="Delhi",       count=403, severity="high",   category="Health"),
-    HeatmapEvent(cx=28,  cy=60,  label="Sao Paulo",   count=176, severity="medium", category="Politics"),
-    HeatmapEvent(cx=50,  cy=55,  label="Cairo",       count=218, severity="medium", category="Conflict"),
-    HeatmapEvent(cx=54,  cy=62,  label="Nairobi",     count=92,  severity="low",    category="Health"),
-    HeatmapEvent(cx=55,  cy=43,  label="Tehran",      count=267, severity="high",   category="Conflict"),
-    HeatmapEvent(cx=79,  cy=67,  label="Jakarta",     count=145, severity="medium", category="Health"),
+    HeatmapEvent(cx=22, cy=38, label="New York",    count=312, severity="high",   category="Health",
+                 confidence_score=0.87, virality_score=1.4, trend="up",   is_coordinated=True,  is_spike_anomaly=False),
+    HeatmapEvent(cx=16, cy=43, label="Los Angeles", count=198, severity="medium", category="Politics",
+                 confidence_score=0.74, virality_score=1.1, trend="up",   is_coordinated=False, is_spike_anomaly=False),
+    HeatmapEvent(cx=47, cy=32, label="London",      count=245, severity="high",   category="Health",
+                 confidence_score=0.91, virality_score=1.6, trend="up",   is_coordinated=True,  is_spike_anomaly=True),
+    HeatmapEvent(cx=49, cy=30, label="Berlin",      count=134, severity="medium", category="Climate",
+                 confidence_score=0.68, virality_score=0.9, trend="same", is_coordinated=False, is_spike_anomaly=False),
+    HeatmapEvent(cx=53, cy=33, label="Moscow",      count=389, severity="high",   category="Politics",
+                 confidence_score=0.94, virality_score=2.1, trend="up",   is_coordinated=True,  is_spike_anomaly=True),
+    HeatmapEvent(cx=72, cy=38, label="Beijing",     count=521, severity="high",   category="Science",
+                 confidence_score=0.82, virality_score=1.8, trend="up",   is_coordinated=True,  is_spike_anomaly=False),
+    HeatmapEvent(cx=76, cy=44, label="Tokyo",       count=287, severity="medium", category="Finance",
+                 confidence_score=0.71, virality_score=1.3, trend="same", is_coordinated=False, is_spike_anomaly=False),
+    HeatmapEvent(cx=70, cy=50, label="Delhi",       count=403, severity="high",   category="Health",
+                 confidence_score=0.85, virality_score=1.7, trend="up",   is_coordinated=False, is_spike_anomaly=True),
+    HeatmapEvent(cx=28, cy=60, label="Sao Paulo",   count=176, severity="medium", category="Politics",
+                 confidence_score=0.69, virality_score=1.0, trend="same", is_coordinated=False, is_spike_anomaly=False),
+    HeatmapEvent(cx=50, cy=55, label="Cairo",       count=218, severity="medium", category="Conflict",
+                 confidence_score=0.76, virality_score=1.2, trend="up",   is_coordinated=False, is_spike_anomaly=False),
+    HeatmapEvent(cx=54, cy=62, label="Nairobi",     count=92,  severity="low",    category="Health",
+                 confidence_score=0.62, virality_score=0.8, trend="down", is_coordinated=False, is_spike_anomaly=False),
+    HeatmapEvent(cx=55, cy=43, label="Tehran",      count=267, severity="high",   category="Conflict",
+                 confidence_score=0.89, virality_score=1.7, trend="up",   is_coordinated=True,  is_spike_anomaly=False),
+    HeatmapEvent(cx=79, cy=67, label="Jakarta",     count=145, severity="medium", category="Health",
+                 confidence_score=0.69, virality_score=1.1, trend="same", is_coordinated=False, is_spike_anomaly=False),
 ]
 
 # RegionStats fields:
@@ -149,16 +165,39 @@ _NARRATIVES: list[NarrativeItem] = [
     NarrativeItem(rank=6, title="Miracle cure claims spread via encrypted messaging apps",       category="Health",   volume=5100,  trend="same"),
 ]
 
-# Messages for the live WebSocket ticker strip at the top of the heatmap page.
-# In production these would be generated from real Change Stream events.
+# Structured feed items for the live WebSocket ticker.
+# Each entry includes city/category/severity so the frontend can render
+# colour-coded intelligence cards without parsing the message string.
 _FEED_ITEMS = [
-    "New event detected · Health · Jakarta",
-    "Spike alert · Politics · Washington DC (+34%)",
-    "Cluster identified · Finance · London",
-    "Narrative variant · Climate · Berlin",
-    "Agent verdict: FALSE · Health · New York",
-    "Trending narrative · Science · Tokyo",
+    {"city": "Jakarta",       "category": "Health",   "severity": "medium", "verb": "New event detected"},
+    {"city": "Washington DC", "category": "Politics", "severity": "high",   "verb": "Spike alert"},
+    {"city": "London",        "category": "Finance",  "severity": "high",   "verb": "Cluster identified"},
+    {"city": "Berlin",        "category": "Climate",  "severity": "medium", "verb": "Narrative variant"},
+    {"city": "New York",      "category": "Health",   "severity": "high",   "verb": "Agent verdict: FALSE"},
+    {"city": "Tokyo",         "category": "Science",  "severity": "medium", "verb": "Trending narrative"},
+    {"city": "Moscow",        "category": "Politics", "severity": "high",   "verb": "Coordinated activity"},
+    {"city": "Delhi",         "category": "Health",   "severity": "high",   "verb": "Spike anomaly detected"},
+    {"city": "Beijing",       "category": "Science",  "severity": "high",   "verb": "State-linked network"},
+    {"city": "Tehran",        "category": "Conflict", "severity": "high",   "verb": "Narrative flagged"},
 ]
+
+# Neighbour cities used by the /simulate endpoint for spread projection.
+# Each entry is (city_name, base_spread_factor) — factor relative to origin count.
+_SPREAD_NEIGHBOURS: dict[str, list[tuple[str, float]]] = {
+    "New York":    [("Boston", 0.45), ("Philadelphia", 0.38), ("Washington DC", 0.30), ("Chicago", 0.20)],
+    "Los Angeles": [("San Francisco", 0.50), ("San Diego", 0.40), ("Las Vegas", 0.25), ("Phoenix", 0.18)],
+    "London":      [("Manchester", 0.55), ("Birmingham", 0.42), ("Amsterdam", 0.35), ("Dublin", 0.28)],
+    "Berlin":      [("Warsaw", 0.52), ("Hamburg", 0.45), ("Vienna", 0.38), ("Prague", 0.32)],
+    "Moscow":      [("St. Petersburg", 0.60), ("Minsk", 0.42), ("Kyiv", 0.30), ("Kazan", 0.25)],
+    "Beijing":     [("Shanghai", 0.65), ("Tianjin", 0.55), ("Chengdu", 0.35), ("Wuhan", 0.28)],
+    "Tokyo":       [("Osaka", 0.62), ("Nagoya", 0.50), ("Seoul", 0.28), ("Fukuoka", 0.22)],
+    "Delhi":       [("Mumbai", 0.55), ("Kolkata", 0.42), ("Bangalore", 0.38), ("Hyderabad", 0.30)],
+    "Sao Paulo":   [("Rio de Janeiro", 0.60), ("Brasilia", 0.35), ("Buenos Aires", 0.22), ("Lima", 0.18)],
+    "Cairo":       [("Alexandria", 0.65), ("Amman", 0.30), ("Riyadh", 0.22), ("Beirut", 0.18)],
+    "Nairobi":     [("Mombasa", 0.55), ("Addis Ababa", 0.32), ("Dar es Salaam", 0.28), ("Kampala", 0.20)],
+    "Tehran":      [("Isfahan", 0.60), ("Baghdad", 0.25), ("Kabul", 0.20), ("Ankara", 0.18)],
+    "Jakarta":     [("Surabaya", 0.62), ("Bandung", 0.55), ("Kuala Lumpur", 0.30), ("Singapore", 0.25)],
+}
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -275,17 +314,79 @@ async def heatmap_stream(websocket: WebSocket):
     idx = 0
     try:
         while True:
+            item = _FEED_ITEMS[idx % len(_FEED_ITEMS)]
             payload = {
                 "type":      "event",
-                "message":   _FEED_ITEMS[idx % len(_FEED_ITEMS)],
-                "delta":     random.randint(1, 8),  # simulate new events arriving
+                "message":   f"{item['verb']} · {item['category']} · {item['city']}",
+                "city":      item["city"],
+                "category":  item["category"],
+                "severity":  item["severity"],
+                "delta":     random.randint(1, 8),
                 "timestamp": datetime.now(tz=timezone.utc).isoformat(),
             }
             await websocket.send_text(json.dumps(payload))
             idx += 1
-            await asyncio.sleep(3)  # push a message every 3 seconds
+            await asyncio.sleep(3)
     except WebSocketDisconnect:
-        # Client closed the tab or navigated away — this is normal, not an error
         logger.info("Heatmap WebSocket client disconnected")
     except Exception as exc:
         logger.warning("Heatmap WebSocket error: %s", exc)
+
+
+# ── Predictive spread simulation ───────────────────────────────────────────────
+
+@router.post("/simulate", response_model=SimulateResponse)
+async def simulate_spread(body: SimulateRequest):
+    """
+    Run a velocity-diffusion spread simulation for a single hotspot.
+
+    Uses the hotspot's intelligence-scored reality_score and virality_score
+    to project how many events will surface in neighbouring cities over the
+    requested time horizon.
+
+    Request body:
+      hotspot_label       — label of the origin hotspot (must match a seed event)
+      category            — used to synthesise an event when label is unknown
+      time_horizon_hours  — projection window (default 48 h)
+
+    Response:
+      confidence          — simulation confidence (0–1), inversely proportional
+                            to reality_score (more destabilised = higher certainty)
+      model               — model identifier string
+      projected_spread    — list of { city, projectedCount } sorted by impact desc
+    """
+    # Resolve origin event from seed data; synthesise if not found
+    event = next((e for e in _EVENTS if e.label == body.hotspot_label), None)
+    if event is None:
+        event = HeatmapEvent(
+            label=body.hotspot_label or "Unknown",
+            count=100,
+            severity="medium",
+            category=body.category or "General",
+        )
+
+    scored = assess_event(event)
+
+    # Simulation confidence: higher risk → more certain the misinfo will spread
+    sim_confidence = round(
+        max(0.40, min(0.95, 1.0 - (scored.reality_score or 50) / 100 * 0.55)),
+        2,
+    )
+
+    virality       = event.virality_score or 1.0
+    horizon_factor = body.time_horizon_hours / 48.0
+
+    neighbours = _SPREAD_NEIGHBOURS.get(event.label, [("Adjacent Region", 0.30)])
+    projected  = [
+        SpreadCity(
+            city=city,
+            projectedCount=max(10, int(event.count * virality * factor * horizon_factor)),
+        )
+        for city, factor in neighbours[:4]
+    ]
+
+    return SimulateResponse(
+        confidence=sim_confidence,
+        model="velocity-diffusion-v2",
+        projected_spread=projected,
+    )
