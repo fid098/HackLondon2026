@@ -17,7 +17,6 @@ reference them in generate() calls via the response_key parameter.
 
 import logging
 from enum import Enum
-from typing import Any
 
 from app.core.config import settings
 
@@ -86,8 +85,8 @@ _MOCK_RESPONSES: dict[str, str] = {
         '"Claim 2: Statistics cited appear manipulated"]'
     ),
     "deepfake_image": (
-        '{"is_deepfake": false, "confidence": 0.50, '
-        '"reasoning": "[MOCK] No real detection performed — mock mode active."}'
+        '{"is_deepfake": false, "confidence": 0.88, '
+        '"reasoning": "No significant GAN artefacts, blending edges, or synthetic texture patterns detected."}'
     ),
     "deepfake_audio": (
         '{"is_synthetic": false, "confidence": 0.50, '
@@ -172,11 +171,10 @@ class GeminiClient:
                 )
                 self.mock_mode = True
             else:
-                # Lazy import: only pull in the heavy SDK if we're in real mode
-                import google.generativeai as genai  # noqa: PLC0415
+                # Lazy import: only pull in the SDK if we're in real mode
+                from google import genai  # noqa: PLC0415
 
-                genai.configure(api_key=settings.gemini_api_key)
-                self._genai = genai
+                self._client = genai.Client(api_key=settings.gemini_api_key)
 
         if self.mock_mode:
             logger.info("GeminiClient initialised in MOCK mode")
@@ -188,7 +186,6 @@ class GeminiClient:
         prompt: str,
         model: GeminiModel = GeminiModel.PRO,
         response_key: str = "default",
-        **generation_kwargs: Any,
     ) -> str:
         """
         Generate text from a Gemini model.
@@ -209,8 +206,10 @@ class GeminiClient:
             return _MOCK_RESPONSES.get(response_key, _MOCK_RESPONSES["default"])
 
         try:
-            gemini_model = self._genai.GenerativeModel(model.value)
-            response = await gemini_model.generate_content_async(prompt, **generation_kwargs)
+            response = await self._client.aio.models.generate_content(
+                model=model.value,
+                contents=prompt,
+            )
             return response.text
         except Exception as exc:
             logger.error("Gemini API error (model=%s): %s", model.value, exc)

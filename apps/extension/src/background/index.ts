@@ -51,10 +51,16 @@ interface Settings {
   meetingModeEnabled: boolean
 }
 
+interface TriageHighlight {
+  text: string
+  label: string
+}
+
 interface TriageResult {
   verdict: string
   confidence: number
   summary: string
+  highlights?: TriageHighlight[]
 }
 
 interface VideoFramePayload {
@@ -170,8 +176,10 @@ chrome.runtime.onMessage.addListener(
       analyzeViaAPI(text)
         .then((result) => {
           sendResponse({ ok: true, data: result })
-          // Increment the toolbar badge counter for each flagged result
-          updateBadge()
+          // Increment the toolbar badge counter only for suspicious verdicts
+          if (result.verdict !== 'TRUE' && result.verdict !== 'UNVERIFIED') {
+            updateBadge()
+          }
         })
         .catch((err: Error) => sendResponse({ ok: false, error: err.message }))
       return true   // ← KEEP THIS: tells Chrome to wait for the async sendResponse call
@@ -239,7 +247,7 @@ async function analyzeViaAPI(text: string): Promise<TriageResult> {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify({ text }),
-    signal:  AbortSignal.timeout(15000),
+    signal:  AbortSignal.timeout(55000),  // article fetch (~15s) + Gemini (~30s)
   })
 
   if (!res.ok) throw new Error(`API error ${res.status}`)
@@ -295,11 +303,15 @@ async function analyzeVideoFrame(payload: VideoFramePayload): Promise<DeepfakeFr
 
   const normalizedScore = Math.max(0, Math.min(1, Number(data.confidence ?? 0)))
   const scorePercent = Math.round(normalizedScore * 100)
+  // deepfakeScore = probability of being fake.
+  // When is_deepfake=true, confidence IS the fake probability.
+  // When is_deepfake=false, confidence is the "real" probability — invert it.
+  const deepfakeScore = data.is_deepfake ? scorePercent : (100 - scorePercent)
 
   return {
     label: data.is_deepfake ? 'SUSPECTED_FAKE' : 'REAL',
     confidence: scorePercent,
-    deepfakeScore: scorePercent,
+    deepfakeScore,
     explainability: data.reasoning ?? 'Frame analysis complete.',
   }
 }

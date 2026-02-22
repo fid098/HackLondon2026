@@ -17,10 +17,16 @@ const VIDEO_SCAN_TICK_MS = 2000
 
 const hostname = window.location.hostname.toLowerCase()
 
+type TriageHighlight = {
+  text: string   // verbatim phrase
+  label: string  // "ai_generated" | "accurate" | "misleading"
+}
+
 type TriageResult = {
   verdict: string
   confidence: number
   summary: string
+  highlights?: TriageHighlight[]
 }
 
 type DeepfakeFrameResult = {
@@ -83,15 +89,30 @@ let _videoRiskState = new WeakMap<HTMLVideoElement, VideoRiskState>()
 const _frameCanvas = document.createElement('canvas')
 const _frameContext = _frameCanvas.getContext('2d')
 
-chrome.runtime.sendMessage({ type: 'GET_SETTINGS' }, (res: RuntimeResponse<ExtensionSettings>) => {
-  if (chrome.runtime.lastError || !res?.ok || !res.data) return
-  if (typeof res.data.redFlagEnabled === 'boolean') {
-    _redFlagEnabled = res.data.redFlagEnabled
+/** Returns false when the extension has been reloaded and this content script is orphaned. */
+function isExtensionAlive(): boolean {
+  try {
+    return !!chrome.runtime?.id
+  } catch {
+    return false
   }
-  if (typeof res.data.meetingModeEnabled === 'boolean') {
-    _meetingModeEnabled = res.data.meetingModeEnabled
+}
+
+if (isExtensionAlive()) {
+  try {
+    chrome.runtime.sendMessage({ type: 'GET_SETTINGS' }, (res: RuntimeResponse<ExtensionSettings>) => {
+      if (chrome.runtime.lastError || !res?.ok || !res.data) return
+      if (typeof res.data.redFlagEnabled === 'boolean') {
+        _redFlagEnabled = res.data.redFlagEnabled
+      }
+      if (typeof res.data.meetingModeEnabled === 'boolean') {
+        _meetingModeEnabled = res.data.meetingModeEnabled
+      }
+    })
+  } catch {
+    // Context already gone — silently ignore
   }
-})
+}
 
 function injectBadge(el: HTMLElement, verdict: string, confidence: number): void {
   if (el.querySelector('.tg-badge')) return
@@ -113,6 +134,13 @@ function removeTooltip(): void {
 function showTooltip(text: string, rect: DOMRect): void {
   removeTooltip()
 
+  // Capture the container element NOW — clicking the button will clear the selection
+  const sel = window.getSelection()
+  if (sel?.rangeCount) {
+    const anchor = sel.getRangeAt(0).commonAncestorContainer
+    _pendingHighlightTarget = anchor instanceof Element ? anchor : anchor.parentElement
+  }
+
   const tip = document.createElement('div')
   tip.id = 'tg-tooltip'
   tip.className = 'tg-tooltip'
@@ -127,60 +155,106 @@ function showTooltip(text: string, rect: DOMRect): void {
 
   document.getElementById('tg-analyze-btn')?.addEventListener('click', () => {
     removeTooltip()
+    const highlightTarget = _pendingHighlightTarget
+    _pendingHighlightTarget = null
     sendAnalyze(text, (result) => {
-      showResultBanner(result.verdict, result.confidence, result.summary)
+      showResultBanner(result.verdict, result.confidence, result.summary, result.highlights)
+      if (highlightTarget && result.highlights?.length) {
+        clearHighlights(highlightTarget)
+        applyHighlights(highlightTarget, result.highlights)
+      }
     })
   })
 }
 
-function showResultBanner(verdict: string, confidence: number, summary: string): void {
+function showResultBanner(
+  verdict: string,
+  confidence: number,
+  summary: string,
+  highlights?: TriageHighlight[],
+): void {
   document.getElementById('tg-result-banner')?.remove()
 
   const banner = document.createElement('div')
   banner.id = 'tg-result-banner'
   banner.className = `tg-result-banner ${verdictClass(verdict)}`
-  banner.innerHTML =
-    `<div class="tg-result-header">` +
+
+  // Header
+  const header = document.createElement('div')
+  header.className = 'tg-result-header'
+  header.innerHTML =
     `<span class="tg-badge-icon">[TG]</span>` +
     `<strong>TruthGuard</strong>` +
     `<span class="tg-result-verdict">${verdict} - ${confidence}%</span>` +
-    `<button class="tg-result-close" id="tg-result-close">x</button>` +
-    `</div>` +
-    `<p class="tg-result-summary">${summary}</p>`
+    `<button class="tg-result-close" id="tg-result-close">x</button>`
+  banner.appendChild(header)
+
+  // Summary
+  const summaryEl = document.createElement('p')
+  summaryEl.className = 'tg-result-summary'
+  summaryEl.textContent = summary
+  banner.appendChild(summaryEl)
+
+  // Highlight chips (phrase-level annotations)
+  if (highlights?.length) {
+    const row = document.createElement('div')
+    row.className = 'tg-highlights-row'
+    for (const h of highlights) {
+      const chip = document.createElement('span')
+      chip.className = `tg-hl-chip tg-hl-${h.label.replace(/_/g, '-')}`
+      const icon = h.label === 'ai_generated' ? '🤖' : h.label === 'accurate' ? '✓' : '⚠'
+      chip.textContent = `${icon} ${truncate(h.text, 48)}`
+      chip.title = h.text
+      row.appendChild(chip)
+    }
+    banner.appendChild(row)
+  }
 
   document.body.appendChild(banner)
-
   document.getElementById('tg-result-close')?.addEventListener('click', () => banner.remove())
-  setTimeout(() => banner.remove(), 12000)
+  setTimeout(() => banner.remove(), 15000)
 }
 
 function sendAnalyze(text: string, callback: (result: TriageResult) => void): void {
-  chrome.runtime.sendMessage({ type: 'ANALYZE_TEXT', payload: text }, (response: RuntimeResponse<TriageResult>) => {
-    if (chrome.runtime.lastError) return
-    if (response?.ok && response.data) {
-      callback(response.data)
-    }
-  })
+  if (!isExtensionAlive()) return
+  try {
+    chrome.runtime.sendMessage({ type: 'ANALYZE_TEXT', payload: text }, (response: RuntimeResponse<TriageResult>) => {
+      if (chrome.runtime.lastError) return
+      if (response?.ok && response.data) {
+        callback(response.data)
+      }
+    })
+  } catch {
+    // Extension context invalidated — ignore
+  }
 }
 
 function sendAnalyzeVideoFrame(
   payload: VideoFramePayload,
   callback: (result: DeepfakeFrameResult | null) => void,
 ): void {
-  chrome.runtime.sendMessage(
-    { type: 'ANALYZE_VIDEO_FRAME', payload },
-    (response: RuntimeResponse<DeepfakeFrameResult>) => {
-      if (chrome.runtime.lastError) {
+  if (!isExtensionAlive()) {
+    callback(null)
+    return
+  }
+  try {
+    chrome.runtime.sendMessage(
+      { type: 'ANALYZE_VIDEO_FRAME', payload },
+      (response: RuntimeResponse<DeepfakeFrameResult>) => {
+        if (chrome.runtime.lastError) {
+          callback(null)
+          return
+        }
+        if (response?.ok && response.data) {
+          callback(response.data)
+          return
+        }
         callback(null)
-        return
-      }
-      if (response?.ok && response.data) {
-        callback(response.data)
-        return
-      }
-      callback(null)
-    },
-  )
+      },
+    )
+  } catch {
+    callback(null)
+  }
 }
 
 function platformNameFromHost(host: string): string {
@@ -318,6 +392,79 @@ function upsertVideoRiskBadge(video: HTMLVideoElement, score: number, state: Vid
   }
 }
 
+// ── Text highlighting ────────────────────────────────────────────────────────
+
+/** Element whose text content the current selection lives in. Captured before
+ *  the tooltip button is clicked (clicking clears the selection). */
+let _pendingHighlightTarget: Element | null = null
+
+function highlightPhraseInElement(el: Element, phrase: string, className: string): void {
+  if (!phrase.trim()) return
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+  let node: Text | null
+  while ((node = walker.nextNode() as Text | null)) {
+    const content = node.textContent ?? ''
+    const idx = content.indexOf(phrase)
+    if (idx === -1) continue
+    const parent = node.parentNode
+    if (!parent || (parent as Element).closest?.('.tg-hl')) continue  // skip already-highlighted
+
+    const mark = document.createElement('mark')
+    mark.className = `tg-hl ${className}`
+    mark.setAttribute('data-tg-hl', '1')
+    mark.textContent = phrase
+
+    const before = content.slice(0, idx)
+    const after = content.slice(idx + phrase.length)
+    if (before) parent.insertBefore(document.createTextNode(before), node)
+    parent.insertBefore(mark, node)
+    if (after) parent.insertBefore(document.createTextNode(after), node)
+    parent.removeChild(node)
+    break  // only first occurrence
+  }
+}
+
+function applyHighlights(container: Element, highlights: TriageHighlight[]): void {
+  for (const h of highlights) {
+    const cls = `tg-hl-${h.label.replace(/_/g, '-')}`
+    highlightPhraseInElement(container, h.text, cls)
+  }
+}
+
+function clearHighlights(container: Element): void {
+  container.querySelectorAll<HTMLElement>('[data-tg-hl]').forEach((mark) => {
+    const parent = mark.parentNode
+    if (!parent) return
+    parent.replaceChild(document.createTextNode(mark.textContent ?? ''), mark)
+    parent.normalize()
+  })
+}
+
+/**
+ * Finds the best article body container to apply page-level highlights to.
+ * Tries progressively broader selectors until one has enough text content.
+ */
+function findArticleBody(): Element {
+  const candidates = [
+    'article',
+    'main',
+    '[role="main"]',
+    '.article-body',
+    '.article-content',
+    '.post-content',
+    '.entry-content',
+    '#article-body',
+    '#content',
+  ]
+  for (const sel of candidates) {
+    const el = document.querySelector(sel)
+    if (el && (el.textContent?.trim().length ?? 0) > 200) return el
+  }
+  return document.body
+}
+
+// ── Video scanning ───────────────────────────────────────────────────────────
+
 function scanVideos(): void {
   const selector = getVideoSelector(hostname)
   if (!selector) return
@@ -325,7 +472,7 @@ function scanVideos(): void {
   const meetingHost = isMeetingHostname(hostname)
 
   if (!_redFlagEnabled) {
-    if (meetingHost) clearVideoRiskBadges()
+    clearVideoRiskBadges()
     return
   }
 
@@ -419,7 +566,18 @@ chrome.runtime.onMessage.addListener(
     if (message.type === 'SHOW_RESULT') {
       const payload = message.payload as TriageResult | undefined
       if (payload) {
-        showResultBanner(payload.verdict, payload.confidence, payload.summary)
+        showResultBanner(payload.verdict, payload.confidence, payload.summary, payload.highlights)
+      }
+      sendResponse({ ok: true })
+      return true
+    }
+
+    if (message.type === 'APPLY_PAGE_HIGHLIGHTS') {
+      const highlights = message.payload as TriageHighlight[] | undefined
+      if (highlights?.length) {
+        const body = findArticleBody()
+        clearHighlights(body)
+        applyHighlights(body, highlights)
       }
       sendResponse({ ok: true })
       return true
@@ -472,11 +630,17 @@ chrome.runtime.onMessage.addListener(
 scanPosts()
 scanVideos()
 
-window.setInterval(() => {
+const _scanInterval = window.setInterval(() => {
+  if (!isExtensionAlive()) {
+    clearInterval(_scanInterval)
+    observer.disconnect()
+    return
+  }
   scanVideos()
 }, VIDEO_SCAN_TICK_MS)
 
 const observer = new MutationObserver(() => {
+  if (!isExtensionAlive()) return
   scanPosts()
   scanVideos()
 })

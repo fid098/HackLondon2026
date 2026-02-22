@@ -11,10 +11,16 @@ interface Settings {
   meetingModeEnabled: boolean
 }
 
+interface TriageHighlight {
+  text: string
+  label: string
+}
+
 interface TriageResult {
   verdict: string
   confidence: number
   summary: string
+  highlights?: TriageHighlight[]
 }
 
 interface RuntimeResponse<T> {
@@ -46,7 +52,7 @@ interface MeetingModeStatus {
 
 const DEFAULT_SETTINGS: Settings = {
   enabled: true,
-  sensitivity: 'high',
+  sensitivity: 'medium',
   apiBase: 'http://localhost:8000',
   redFlagEnabled: true,
   meetingModeEnabled: false,
@@ -162,6 +168,7 @@ function detectPlatform(url: string): string {
     const host = new URL(url).hostname.toLowerCase()
     if (host.includes('meet.google.com')) return 'google_meet'
     if (host.includes('zoom.us')) return 'zoom'
+    if (host === 'localhost' || host === '127.0.0.1') return 'google_meet'
     if (host.includes('youtube')) return 'youtube'
     if (host.includes('tiktok')) return 'tiktok'
     if (host.includes('instagram')) return 'instagram'
@@ -369,9 +376,15 @@ export default function Popup() {
         return
       }
 
+      const platform = tab.url ? detectPlatform(tab.url) : 'web'
+      if (platform !== 'google_meet' && platform !== 'zoom') {
+        setMeetingMessage('Navigate to Google Meet or Zoom, then try again.')
+        return
+      }
+
       const response = await sendTabMessage<MeetingModeStatus>(tab.id, { type: 'TG_FORCE_SCAN_MEETING' })
       if (!response.ok || !response.data) {
-        setMeetingMessage('Could not run scan on this tab.')
+        setMeetingMessage('Could not connect to the meeting tab — try refreshing the page.')
         return
       }
 
@@ -396,17 +409,26 @@ export default function Popup() {
         return
       }
 
-      const fetchResult = fetch(`${settings.apiBase}/api/v1/triage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: `URL: ${url}` }),
-      }).then((res) => res.json() as Promise<TriageResult>)
-
-      const [data] = await Promise.all([fetchResult, sleep(2000)])
+      const [response] = await Promise.all([
+        sendRuntimeMessage<TriageResult>({ type: 'ANALYZE_TEXT', payload: `URL: ${url}` }),
+        sleep(2000),
+      ])
       setProgress(100)
-      setResult(data)
-    } catch {
-      setResult({ verdict: 'UNVERIFIED', confidence: 0, summary: 'API unreachable.' })
+
+      if (response.ok && response.data) {
+        setResult(response.data)
+        // Forward highlights to the page so phrases are highlighted inline
+        if (tab?.id && response.data.highlights?.length) {
+          void sendTabMessage(tab.id, {
+            type: 'APPLY_PAGE_HIGHLIGHTS',
+            payload: response.data.highlights,
+          })
+        }
+      } else {
+        setResult({ verdict: 'UNVERIFIED', confidence: 0, summary: response.error ?? 'Analysis failed.' })
+      }
+    } catch (err) {
+      setResult({ verdict: 'UNVERIFIED', confidence: 0, summary: (err as Error).message || 'API unreachable.' })
     } finally {
       setAnalysing(false)
     }
@@ -580,8 +602,8 @@ export default function Popup() {
             background: settings.meetingModeEnabled ? 'rgba(99,102,241,0.2)' : 'rgba(100,116,139,0.15)',
             color: settings.meetingModeEnabled ? C.violet : C.muted,
             border: `1px solid ${settings.meetingModeEnabled ? 'rgba(99,102,241,0.4)' : 'rgba(100,116,139,0.3)'}`,
-            cursor: settings.enabled ? 'pointer' : 'not-allowed',
-            opacity: settings.enabled ? 1 : 0.45,
+            cursor: meetingBusy ? 'wait' : settings.enabled ? 'pointer' : 'not-allowed',
+            opacity: settings.enabled && !meetingBusy ? 1 : 0.45,
           }}
         >
           {settings.meetingModeEnabled ? 'ON' : 'OFF'}
@@ -631,7 +653,7 @@ export default function Popup() {
           <div>Detected videos: {meetingStatus.activeVideos}</div>
           <div>Sampled frames: {meetingStatus.sampledFrames}</div>
           <div>
-            Latest AI risk: {meetingStatus.latestRiskScore == null ? '--' : `${meetingStatus.latestRiskScore}%`} ({meetingStatus.latestLabel})
+            Deepfake risk: {meetingStatus.latestRiskScore == null ? '--' : `${meetingStatus.latestRiskScore}% (${meetingStatus.latestLabel === 'SUSPECTED_FAKE' ? 'AI suspected' : meetingStatus.latestLabel === 'REAL' ? 'looks real' : 'unverified'})`}
           </div>
         </div>
       )}
@@ -642,7 +664,7 @@ export default function Popup() {
 
       <button
         onClick={() => void runMeetingScanNow()}
-        disabled={meetingBusy || status !== 'connected'}
+        disabled={meetingBusy || status !== 'connected' || !settings.meetingModeEnabled}
         style={{
           width: '100%',
           padding: '7px 0',
@@ -654,7 +676,7 @@ export default function Popup() {
           color: C.accent,
           border: '1px solid rgba(52,211,153,0.35)',
           marginBottom: 8,
-          opacity: meetingBusy || status !== 'connected' ? 0.45 : 1,
+          opacity: meetingBusy || status !== 'connected' || !settings.meetingModeEnabled ? 0.45 : 1,
         }}
       >
         {meetingBusy ? 'Scanning meeting...' : 'Scan camera feeds now'}

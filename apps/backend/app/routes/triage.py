@@ -13,6 +13,7 @@ fetches the actual page content and sends that to Gemini instead of just the
 URL string, producing far more accurate verdicts in real (non-mock) mode.
 """
 
+import hashlib
 import json
 import logging
 import re
@@ -33,11 +34,8 @@ _URL_PATTERN = re.compile(r"https?://\S+")
 # Social-media domains that rarely have extractable article body text.
 # For these, we skip content extraction and fall back to URL-only analysis.
 _SKIP_EXTRACTION = {
-    "twitter.com", "x.com",
     "instagram.com",
-    "tiktok.com",
     "facebook.com", "fb.com",
-    "reddit.com",
     "telegram.org",
 }
 
@@ -128,6 +126,11 @@ _ARTICLE_MOCK_TEMPLATES = [
 _TRIAGE_PROMPT_URL = """\
 You are an AI content integrity analyst specialising in misinformation and AI-generated media detection.
 
+IMPORTANT — Knowledge cutoff: Your training data ends in early 2025. Events reported after that date are unknown to you.
+Do NOT classify recent news as AI_GENERATED or FALSE simply because you are unfamiliar with it.
+Use UNVERIFIED for claims about events you cannot verify from your training data.
+Reserve AI_GENERATED for stylistic evidence (unnaturally smooth prose, generic phrasing, hallucinated citations) — not for unfamiliarity with the topic.
+
 Analyse the article below and answer these questions:
 1. Are the factual claims accurate and well-supported?
 2. Does the writing style, phrasing, or structure suggest AI generation (e.g. repetitive phrasing, unnaturally smooth prose, lack of original reporting, hallucinated citations)?
@@ -148,15 +151,26 @@ Classify the content using these verdicts:
 - UNVERIFIED: Cannot be confirmed or denied without further investigation.
 - SATIRE: Clearly satirical or parody content.
 
+Identify up to 4 short phrases (verbatim substrings from the PAGE CONTENT, ≤ 80 chars each) that show either AI-generated/synthetic writing OR factual/human-authored writing. Return at least 1-2 highlights if any phrases stand out.
+
 Respond with valid JSON and nothing else:
 {{
   "verdict": "<TRUE|FALSE|MISLEADING|AI_GENERATED|UNVERIFIED|SATIRE>",
   "confidence": <integer 0-100>,
-  "summary": "<one or two sentences: state whether it appears human-authored or AI-generated, and whether the claims are accurate, misleading, or unverifiable>"
+  "summary": "<one or two sentences: state whether it appears human-authored or AI-generated, and whether the claims are accurate, misleading, or unverifiable>",
+  "highlights": [
+    {{"text": "<exact verbatim phrase>", "label": "ai_generated"}},
+    {{"text": "<exact verbatim phrase>", "label": "accurate"}}
+  ]
 }}"""
 
 _TRIAGE_PROMPT_TEXT = """\
 You are an AI content integrity analyst specialising in misinformation and AI-generated content detection.
+
+IMPORTANT — Knowledge cutoff: Your training data ends in early 2025. Events reported after that date are unknown to you.
+Do NOT classify recent news as AI_GENERATED or FALSE simply because you are unfamiliar with it.
+Use UNVERIFIED for claims about events you cannot verify from your training data.
+Reserve AI_GENERATED for stylistic evidence (unnaturally smooth prose, generic phrasing, hallucinated citations) — not for unfamiliarity with the topic.
 
 Analyse the following text and answer:
 1. Do the claims appear factually accurate?
@@ -174,11 +188,44 @@ Classify using these verdicts:
 - UNVERIFIED: Cannot be confirmed or denied.
 - SATIRE: Clearly satirical or parody content.
 
+Identify up to 4 short phrases (verbatim substrings from the TEXT above, ≤ 80 chars each) that show either AI-generated/synthetic writing OR factual/human-authored writing. Return at least 1-2 highlights if any phrases stand out.
+
 Respond with valid JSON and nothing else:
 {{
   "verdict": "<TRUE|FALSE|MISLEADING|AI_GENERATED|UNVERIFIED|SATIRE>",
   "confidence": <integer 0-100>,
-  "summary": "<one or two sentences: state whether it appears human-authored or AI-generated, and whether the claims hold up>"
+  "summary": "<one or two sentences: state whether it appears human-authored or AI-generated, and whether the claims hold up>",
+  "highlights": [
+    {{"text": "<exact verbatim phrase>", "label": "ai_generated"}},
+    {{"text": "<exact verbatim phrase>", "label": "accurate"}}
+  ]
+}}"""
+
+_TRIAGE_PROMPT_URL_ONLY = """\
+You are an AI content integrity analyst specialising in misinformation and AI-generated media detection.
+
+You have been given a URL to assess. You cannot browse the internet — do NOT attempt to access it.
+Instead, reason using your training knowledge:
+1. What is the reputation of this platform or domain for accuracy and editorial standards?
+2. Does the URL structure (path, slug, query params, video ID) reveal anything about the content?
+3. Are there known misinformation patterns associated with this source or platform?
+4. If this is a video platform (YouTube, TikTok), what can be inferred from the channel or video identifier?
+
+URL: {url}
+
+Classify using these verdicts:
+- TRUE: The source is generally reliable and no red flags appear in the URL or platform.
+- FALSE: The source or URL pattern is strongly associated with provably false content.
+- MISLEADING: The platform or URL structure suggests selective framing or missing context.
+- AI_GENERATED: The URL or source pattern is associated with AI-generated or synthetic content.
+- UNVERIFIED: Insufficient information to make a confident assessment from the URL alone.
+- SATIRE: The source is a known satire or parody outlet.
+
+Respond with valid JSON and nothing else:
+{{
+  "verdict": "<TRUE|FALSE|MISLEADING|AI_GENERATED|UNVERIFIED|SATIRE>",
+  "confidence": <integer 0-100>,
+  "summary": "<one or two sentences: describe what can be inferred about this URL's reliability from the platform, domain, or URL structure>"
 }}"""
 
 
@@ -186,15 +233,23 @@ class TriageRequest(BaseModel):
     text: str = Field(..., min_length=10, max_length=2000, description="Text to triage")
 
 
+class TriageHighlight(BaseModel):
+    text: str   # exact verbatim phrase from the analyzed content
+    label: str  # "ai_generated" | "accurate" | "misleading"
+
+
 class TriageResponse(BaseModel):
-    verdict: str     # TRUE | FALSE | MISLEADING | UNVERIFIED | SATIRE
-    confidence: int  # 0–100
+    verdict: str                         # TRUE | FALSE | MISLEADING | UNVERIFIED | SATIRE
+    confidence: int                      # 0–100
     summary: str
+    highlights: list[TriageHighlight] = []  # phrase-level annotations
 
 
 def _mock_article_response(url: str, title: str) -> TriageResponse:
     """Return a deterministic, title-personalised mock article verdict."""
-    template = _ARTICLE_MOCK_TEMPLATES[hash(url) % len(_ARTICLE_MOCK_TEMPLATES)]
+    # Use hashlib so the result is stable regardless of PYTHONHASHSEED
+    digest = int(hashlib.md5(url.encode(), usedforsecurity=False).hexdigest(), 16)
+    template = _ARTICLE_MOCK_TEMPLATES[digest % len(_ARTICLE_MOCK_TEMPLATES)]
     display_title = title if title else url
     return TriageResponse(
         verdict=template["verdict"],
@@ -203,21 +258,62 @@ def _mock_article_response(url: str, title: str) -> TriageResponse:
     )
 
 
+# Maps Gemini label synonyms → our canonical three labels.
+# Gemini sometimes writes "hallucinated", "fabricated", "factual", etc.
+_LABEL_ALIASES: dict[str, str] = {
+    "ai_generated":   "ai_generated",
+    "ai generated":   "ai_generated",
+    "hallucinated":   "ai_generated",
+    "fabricated":     "ai_generated",
+    "synthetic":      "ai_generated",
+    "generated":      "ai_generated",
+    "artificial":     "ai_generated",
+    "accurate":       "accurate",
+    "factual":        "accurate",
+    "verified":       "accurate",
+    "sourced":        "accurate",
+    "true":           "accurate",
+    "human_authored": "accurate",
+    "human authored": "accurate",
+    "misleading":     "misleading",
+    "false":          "misleading",
+    "inaccurate":     "misleading",
+    "cherry_picked":  "misleading",
+    "cherry picked":  "misleading",
+    "out_of_context": "misleading",
+    "biased":         "misleading",
+}
+
+
 def _parse_response(raw: str) -> TriageResponse | None:
     """Try to extract a TriageResponse from a raw Gemini reply string."""
     m = re.search(r"\{[\s\S]*\}", raw)
     if m:
         try:
             data = json.loads(m.group())
+            highlights: list[TriageHighlight] = []
+            for h in (data.get("highlights") or [])[:6]:
+                if isinstance(h, dict) and h.get("text") and h.get("label"):
+                    raw_label = str(h["label"]).lower().replace(" ", "_").strip("_")
+                    # Try exact key first, then stripped version
+                    label = _LABEL_ALIASES.get(raw_label) or _LABEL_ALIASES.get(
+                        str(h["label"]).lower().strip()
+                    )
+                    if label:
+                        highlights.append(TriageHighlight(
+                            text=str(h["text"])[:120],
+                            label=label,
+                        ))
             return TriageResponse(
                 verdict=str(data.get("verdict", "UNVERIFIED")).upper(),
                 confidence=max(0, min(100, int(data.get("confidence", 30)))),
                 summary=str(data.get("summary", "Triage complete.")),
+                highlights=highlights,
             )
         except (json.JSONDecodeError, ValueError, TypeError):
             pass
 
-    # Keyword fallback
+    # Keyword fallback (no highlights available)
     upper = raw.upper()
     for v in ("AI_GENERATED", "TRUE", "FALSE", "MISLEADING", "SATIRE"):
         if v in upper:
@@ -235,9 +331,9 @@ async def quick_triage(request: Request, payload: TriageRequest):
     Returns verdict + confidence in ~1 s vs the full debate pipeline's ~10 s.
     Intended for Chrome extension content-script real-time triaging.
 
-    When the text contains a URL and the site supports extraction (news articles,
-    YouTube transcripts), the page content is fetched and analysed rather than
-    just the URL string alone.
+    When the text contains a URL, content is fetched for article sites and
+    analysed in full. For social media and YouTube, Gemini reasons from the
+    URL and platform reputation without attempting to browse the page.
     """
     mock_key = _mock_key_for_text(payload.text)
 
@@ -248,20 +344,25 @@ async def quick_triage(request: Request, payload: TriageRequest):
     if url_match and not gemini_client.mock_mode:
         url = url_match.group()
         if _should_skip_extraction(url):
-            # Social media — no useful body content to scrape, use text prompt
-            prompt = _TRIAGE_PROMPT_TEXT.format(text=payload.text[:2000])
+            # Social media / YouTube — skip scraping, reason from URL + platform knowledge
+            prompt = _TRIAGE_PROMPT_URL_ONLY.format(url=url)
         else:
             title, content = await extract_article_for_triage(url)
-            if content and not content.startswith("[Could not"):
+            content_ok = (
+                content
+                and not content.startswith("[Could not")
+                and len(content.strip()) >= 80  # Reject near-empty extractions
+            )
+            if content_ok:
                 prompt = _TRIAGE_PROMPT_URL.format(
                     url=url,
                     title=title or "Unknown",
-                    content=content[:6000],  # Leave room for prompt wrapper
+                    content=content[:3000],  # Keep prompt short for faster Gemini response
                 )
             else:
-                # Extraction failed — fall back to URL-only prompt
-                logger.warning("Content extraction failed for %s, falling back to text prompt", url)
-                prompt = _TRIAGE_PROMPT_TEXT.format(text=payload.text[:2000])
+                # Extraction failed or returned too little — reason from URL structure alone
+                logger.warning("Content extraction failed/insufficient for %s, falling back to URL-only prompt", url)
+                prompt = _TRIAGE_PROMPT_URL_ONLY.format(url=url)
 
     elif url_match and gemini_client.mock_mode and mock_key == "quick_triage_article":
         # Mock mode + article URL: fetch just the title so the response

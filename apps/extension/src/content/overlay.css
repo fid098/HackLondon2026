@@ -158,6 +158,75 @@
   margin: 0;
 }
 
+/* ── Inline text highlights (DOM phrase-level annotations) ───────────────── */
+
+mark.tg-hl {
+  border-radius: 2px;
+  padding: 0 2px;
+  font: inherit;
+  cursor: default;
+}
+
+mark.tg-hl-ai-generated {
+  background: rgba(239, 68, 68, 0.22);
+  color: inherit;
+  outline: 1px solid rgba(239, 68, 68, 0.45);
+}
+
+mark.tg-hl-accurate {
+  background: rgba(16, 185, 129, 0.20);
+  color: inherit;
+  outline: 1px solid rgba(16, 185, 129, 0.40);
+}
+
+mark.tg-hl-misleading {
+  background: rgba(245, 158, 11, 0.20);
+  color: inherit;
+  outline: 1px solid rgba(245, 158, 11, 0.40);
+}
+
+/* ── Highlight chips row in result banner ─────────────────────────────────── */
+
+.tg-highlights-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.tg-hl-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-weight: 600;
+  white-space: nowrap;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tg-hl-chip.tg-hl-ai-generated {
+  background: rgba(239, 68, 68, 0.18);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.tg-hl-chip.tg-hl-accurate {
+  background: rgba(16, 185, 129, 0.18);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.tg-hl-chip.tg-hl-misleading {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
 /* ── Animations ──────────────────────────────────────────────────────────────── */
 
 @keyframes tg-fade-in {

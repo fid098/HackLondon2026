@@ -40,6 +40,8 @@ const VIDEO_SELECTORS: Record<string, string> = {
   'meet.google.com':   'video',
   'zoom.us':           'video',
   'app.zoom.us':       'video',
+  'localhost':         'video',
+  '127.0.0.1':         'video',
 }
 
 /**
@@ -69,7 +71,14 @@ export function getVideoSelector(hostname: string): string | null {
  */
 export function isMeetingHostname(hostname: string): boolean {
   const host = hostname.toLowerCase()
-  return host === 'meet.google.com' || host === 'zoom.us' || host === 'app.zoom.us' || host.endsWith('.zoom.us')
+  return (
+    host === 'meet.google.com' ||
+    host === 'zoom.us' ||
+    host === 'app.zoom.us' ||
+    host.endsWith('.zoom.us') ||
+    host === 'localhost' ||
+    host === '127.0.0.1'
+  )
 }
 
 /** Extracts trimmed text content from a DOM element. */

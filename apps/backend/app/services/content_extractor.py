@@ -24,6 +24,10 @@ _YT_RE = re.compile(
     r"(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/shorts/)([A-Za-z0-9_-]{11})"
 )
 
+_REDDIT_POST_RE = re.compile(r"reddit\.com/r/[^/]+/comments/")
+_TWITTER_STATUS_RE = re.compile(r"(?:twitter\.com|x\.com)/[^/?]+/status/\d+")
+_TIKTOK_VIDEO_RE = re.compile(r"tiktok\.com/@[^/?]+/video/\d+")
+
 _MAX_LEN = 8_000
 
 # CSS selectors tried in priority order to find the main article body.
@@ -51,6 +55,21 @@ _NOISE_TAGS = [
 
 def _is_youtube(url: str) -> bool:
     return bool(_YT_RE.search(url))
+
+
+def _is_reddit_post(url: str) -> bool:
+    """True only for specific post URLs (/r/<sub>/comments/...), not subreddit feeds."""
+    return bool(_REDDIT_POST_RE.search(url))
+
+
+def _is_twitter_post(url: str) -> bool:
+    """True for individual tweet URLs (.../status/<id>)."""
+    return bool(_TWITTER_STATUS_RE.search(url))
+
+
+def _is_tiktok_video(url: str) -> bool:
+    """True for individual TikTok video URLs (@user/video/<id>)."""
+    return bool(_TIKTOK_VIDEO_RE.search(url))
 
 
 def _bs_parse(html: str) -> "BeautifulSoup":  # type: ignore[name-defined]
@@ -112,13 +131,21 @@ _HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/122.0.0.0 Safari/537.36"
+        "Chrome/124.0.0.0 Safari/537.36"
     ),
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-    "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
     "Accept-Encoding": "gzip, deflate, br",
+    "Cache-Control": "no-cache",
+    "Pragma": "no-cache",
     "Referer": "https://www.google.com/",
-    "DNT": "1",
+    "Sec-Ch-Ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+    "Sec-Ch-Ua-Mobile": "?0",
+    "Sec-Ch-Ua-Platform": '"Windows"',
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "cross-site",
+    "Sec-Fetch-User": "?1",
     "Upgrade-Insecure-Requests": "1",
 }
 
@@ -137,7 +164,7 @@ async def extract_from_url(url: str) -> str:
 async def _fetch_structured(url: str) -> tuple[str, str]:
     """Internal: return (title, content) for any non-YouTube URL."""
     try:
-        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
             resp = await client.get(url, headers=_HEADERS)
             resp.raise_for_status()
             title, content = _extract_article_bs4(resp.text)
@@ -169,16 +196,144 @@ async def extract_title_only(url: str) -> str:
     return ""
 
 
+async def extract_from_twitter(url: str) -> tuple[str, str]:
+    """
+    Fetch tweet text via Twitter's public oEmbed API (no key needed).
+
+    Works for individual tweet URLs only (twitter.com/.../status/<id>).
+    The oEmbed response embeds the tweet as HTML; we strip tags to get plain text.
+    """
+    oembed_url = f"https://publish.twitter.com/oembed?url={url}&omit_script=true"
+    try:
+        async with httpx.AsyncClient(timeout=8, follow_redirects=True) as client:
+            resp = await client.get(
+                oembed_url,
+                headers={"User-Agent": "TruthGuard/0.1 (content analysis bot)"},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+
+        author = data.get("author_name", "")
+        html = data.get("html", "")
+
+        # Extract the tweet text from the <p> inside the blockquote
+        tweet_text = ""
+        if html:
+            soup = _bs_parse(html)
+            p = soup.find("p")
+            if p:
+                tweet_text = p.get_text(separator=" ", strip=True)
+
+        if not tweet_text:
+            return "", f"[Could not extract tweet text from {url}]"
+
+        content = f"Author: {author}\nTweet: {tweet_text}"
+        return f"Tweet by {author}", content
+
+    except Exception as exc:
+        logger.warning("Twitter oEmbed failed for %s: %s", url, exc)
+        return "", f"[Could not extract tweet from {url}]"
+
+
+async def extract_from_tiktok(url: str) -> tuple[str, str]:
+    """
+    Fetch TikTok video metadata via TikTok's public oEmbed API (no key needed).
+
+    Works for individual video URLs only (@user/video/<id>).
+    Returns the video title and author name — enough for meaningful analysis.
+    """
+    oembed_url = f"https://www.tiktok.com/oembed?url={url}"
+    try:
+        async with httpx.AsyncClient(timeout=8, follow_redirects=True) as client:
+            resp = await client.get(
+                oembed_url,
+                headers={"User-Agent": "TruthGuard/0.1 (content analysis bot)"},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+
+        title = data.get("title", "").strip()
+        author = data.get("author_name", "").strip()
+
+        if not title and not author:
+            return "", f"[Could not extract TikTok content from {url}]"
+
+        content = f"Author: {author}\nVideo title: {title}"
+        return title, content
+
+    except Exception as exc:
+        logger.warning("TikTok oEmbed failed for %s: %s", url, exc)
+        return "", f"[Could not extract TikTok content from {url}]"
+
+
+async def extract_from_reddit(url: str) -> tuple[str, str]:
+    """
+    Fetch a Reddit post's title and body via the public JSON API (no key needed).
+
+    Appends .json to the post URL, which Reddit serves without authentication
+    for public posts. Returns (title, content) where content is the post title,
+    subreddit, and selftext body joined together.
+    """
+    json_url = url.split("?")[0].rstrip("/") + ".json"
+    try:
+        async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+            resp = await client.get(
+                json_url,
+                headers={"User-Agent": "TruthGuard/0.1 (content analysis bot)"},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+
+        # Reddit JSON: [post_listing, comments_listing]
+        post = data[0]["data"]["children"][0]["data"]
+        title = post.get("title", "")
+        selftext = post.get("selftext", "").strip()
+        subreddit = post.get("subreddit_name_prefixed", "")
+        author = post.get("author", "")
+
+        parts = [f"Title: {title}"]
+        if subreddit:
+            parts.append(f"Subreddit: {subreddit}")
+        if author:
+            parts.append(f"Posted by: u/{author}")
+        if selftext and selftext not in ("[deleted]", "[removed]"):
+            parts.append(f"\n{selftext}")
+
+        content = "\n".join(parts)
+        return title, content[:_MAX_LEN]
+
+    except Exception as exc:
+        logger.warning("Reddit JSON API failed for %s: %s", url, exc)
+        return "", f"[Could not extract Reddit post from {url}]"
+
+
 async def extract_article_for_triage(url: str) -> tuple[str, str]:
     """
     Return (title, body_text) suitable for a triage Gemini prompt.
 
-    Handles YouTube separately (transcript); everything else goes through
-    the BeautifulSoup article extractor.
+    Platform-specific handlers (in priority order):
+      - YouTube  → transcript via youtube-transcript-api, fallback to page scrape
+      - Twitter/X → tweet text via public oEmbed API
+      - TikTok   → video title/author via public oEmbed API
+      - Reddit   → post title + body via public JSON API (post URLs only)
+      - Everything else → BeautifulSoup article extractor
     """
     if _is_youtube(url):
         content = await extract_from_youtube(url)
-        return "YouTube video", content
+        # Extract title from "Title: <name>\n..." formatted content
+        title = "YouTube video"
+        if content and not content.startswith("[Could not"):
+            for line in content.splitlines():
+                if line.startswith("Title: "):
+                    title = line[7:].strip()
+                    break
+        return title, content
+    if _is_twitter_post(url):
+        return await extract_from_twitter(url)
+    if _is_tiktok_video(url):
+        return await extract_from_tiktok(url)
+    if _is_reddit_post(url):
+        return await extract_from_reddit(url)
     return await _fetch_structured(url)
 
 
@@ -207,17 +362,69 @@ async def extract_from_youtube(url: str) -> str:
         except Exception as exc:
             logger.warning("YouTube transcript fetch failed for %s: %s", video_id, exc)
 
-    # Fallback: scrape the page for title + description meta tags
+    # Fallback 1: YouTube oEmbed API (public, no key needed, most reliable)
+    if video_id:
+        try:
+            oembed_url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
+            async with httpx.AsyncClient(timeout=8, follow_redirects=True) as client:
+                resp = await client.get(
+                    oembed_url,
+                    headers={"User-Agent": "TruthGuard/0.1 (content analysis bot)"},
+                )
+                resp.raise_for_status()
+                data = resp.json()
+
+            title = data.get("title", "").strip()
+            author = data.get("author_name", "").strip()
+
+            if title or author:
+                parts = []
+                if title:
+                    parts.append(f"Title: {title}")
+                if author:
+                    parts.append(f"Channel: {author}")
+                parts.append(f"Video ID: {video_id}")
+                return "\n".join(parts)
+        except Exception as exc:
+            logger.warning("YouTube oEmbed failed for %s: %s", video_id, exc)
+
+    # Fallback 2: scrape the page for og meta tags
     try:
         async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
             resp = await client.get(url, headers=_HEADERS)
             resp.raise_for_status()
 
         soup = _bs_parse(resp.text)
-        title = soup.title.string.strip() if (soup.title and soup.title.string) else "Unknown YouTube video"
-        desc_tag = soup.find("meta", attrs={"name": "description"})
-        desc = desc_tag["content"].strip() if desc_tag and desc_tag.get("content") else ""
-        return f"{title}\n\n{desc}"[:_MAX_LEN]
+
+        # Prefer og:title (cleaner than <title> which appends " - YouTube")
+        og_title = soup.find("meta", property="og:title")
+        if og_title and og_title.get("content"):
+            title = og_title["content"].strip()
+        elif soup.title and soup.title.string:
+            title = soup.title.string.strip().removesuffix(" - YouTube").strip()
+        else:
+            title = ""
+
+        # og:description is populated by YouTube in server HTML
+        og_desc = soup.find("meta", property="og:description")
+        if og_desc and og_desc.get("content"):
+            desc = og_desc["content"].strip()
+        else:
+            desc_tag = soup.find("meta", attrs={"name": "description"})
+            desc = desc_tag["content"].strip() if desc_tag and desc_tag.get("content") else ""
+
+        parts = []
+        if title:
+            parts.append(f"Title: {title}")
+        if desc:
+            parts.append(f"Description: {desc}")
+        if video_id:
+            parts.append(f"Video ID: {video_id}")
+
+        content = "\n".join(parts)
+        if len(content) < 30:
+            return f"[Could not extract YouTube content from {url}]"
+        return content[:_MAX_LEN]
     except Exception as exc:
         logger.warning("YouTube scrape fallback failed for %s: %s", url, exc)
         return f"[Could not extract YouTube content from {url}]"
