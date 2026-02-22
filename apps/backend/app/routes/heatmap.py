@@ -82,6 +82,7 @@ from app.models.heatmap import (
     NarrativeItem,
     RegionStats,
 )
+from app.services.stability_scorer import assess_event, assess_region
 
 logger = logging.getLogger(__name__)
 
@@ -211,6 +212,13 @@ async def get_heatmap(
         # Re-rank narratives so the table always starts at #1 after filtering
         for i, n in enumerate(narratives):
             n.rank = i + 1
+
+    # ── Phase 2: Enrich with Reality Stability scores ──────────────────────────
+    # assess_event() populates reality_score, risk_level, and next_action on
+    # each event. assess_region() does the same for region cards.
+    # These are deterministic and fast (pure computation, no I/O).
+    events  = [assess_event(e)  for e in events]
+    regions = [assess_region(r) for r in regions]
 
     return HeatmapResponse(
         events=events,

@@ -62,6 +62,22 @@ const SEV = {
   low: { ring: '#10b981', label: 'Low', text: '#10b981' },
 }
 
+// Risk-level colors for globe visual encoding.
+// When a hotspot has a computed risk_level, we use these instead of SEV
+// to make the "intelligence-scored" view visually distinct.
+const RISK_COLOR = {
+  CRITICAL: '#ef4444',
+  HIGH:     '#f97316',
+  MEDIUM:   '#f59e0b',
+  LOW:      '#10b981',
+}
+
+// Returns the best available color for a hotspot — risk_level takes priority over raw severity.
+function spotColor(s) {
+  return s.risk_level ? (RISK_COLOR[s.risk_level] ?? SEV[s.severity]?.ring ?? '#60a5fa')
+                      : (SEV[s.severity]?.ring ?? '#60a5fa')
+}
+
 const TIME_RANGES = ['1h', '24h', '7d']
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
@@ -392,30 +408,42 @@ export default function Heatmap() {
 
                   /* Feature 7: rings — anomaly hotspots pulse faster */
                   ringsData={globeSpots}
-                  ringColor={s => SEV[s.severity].ring}
+                  ringColor={s => spotColor(s)}
                   ringMaxRadius={s => s.severity === 'high' ? 9 : s.severity === 'medium' ? 6 : 4}
                   ringPropagationSpeed={ringSpeed}
                   ringRepeatPeriod={ringPeriod}
 
                   pointsData={globeSpots}
-                  pointColor={p => SEV[p.severity].ring}
+                  pointColor={p => spotColor(p)}
                   pointAltitude={0.06}
                   pointRadius={pointRadius}
-                  pointLabel={p => `
-                  <div style="background:rgba(4,7,15,0.97);border:1px solid ${SEV[p.severity].ring}88;border-radius:8px;padding:7px 11px;font-size:11px;white-space:nowrap;box-shadow:0 4px 20px ${SEV[p.severity].ring}40;">
-                    <div style="color:${SEV[p.severity].ring};font-weight:800;font-size:13px;margin-bottom:3px;">
+                  pointLabel={p => {
+                    const c = spotColor(p)
+                    const hasScore = p.reality_score != null
+                    return `
+                  <div style="background:rgba(4,7,15,0.97);border:1px solid ${c}88;border-radius:8px;padding:7px 11px;font-size:11px;white-space:nowrap;box-shadow:0 4px 20px ${c}40;max-width:240px;">
+                    <div style="color:${c};font-weight:800;font-size:13px;margin-bottom:4px;display:flex;align-items:center;gap:6px;">
                       ${p.label}
-                      ${p.isSpikeAnomaly ? '<span style="font-size:9px;background:rgba(239,68,68,0.2);color:#ef4444;padding:1px 5px;border-radius:3px;margin-left:6px;">↑ SPIKE</span>' : ''}
-                      ${p.isCoordinated ? '<span style="font-size:9px;background:rgba(245,158,11,0.2);color:#f59e0b;padding:1px 5px;border-radius:3px;margin-left:4px;">⚡ COORD</span>' : ''}
+                      ${p.isSpikeAnomaly ? '<span style="font-size:9px;background:rgba(239,68,68,0.2);color:#ef4444;padding:1px 5px;border-radius:3px;">↑ SPIKE</span>' : ''}
+                      ${p.isCoordinated ? '<span style="font-size:9px;background:rgba(245,158,11,0.2);color:#f59e0b;padding:1px 5px;border-radius:3px;">⚡ COORD</span>' : ''}
                     </div>
-                    <div style="color:#64748b;margin-bottom:3px;">
+                    ${hasScore ? `
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+                      <div style="font-size:18px;font-weight:900;color:${c};line-height:1;">${p.reality_score}</div>
+                      <div>
+                        <div style="font-size:8px;color:#475569;text-transform:uppercase;letter-spacing:0.08em;">Reality Stability</div>
+                        <span style="font-size:9px;font-weight:700;color:${c};background:${c}22;padding:1px 6px;border-radius:3px;">${p.risk_level}</span>
+                      </div>
+                    </div>` : ''}
+                    <div style="color:#64748b;margin-bottom:3px;font-size:10px;">
                       ${p.displayCount.toLocaleString()} events · <b style="color:#94a3b8;">${p.severity}</b> · ${timeRange}
                     </div>
                     <div style="color:#334155;font-size:10px;">
                       Confidence: ${Math.round((p.confidence_score ?? 0) * 100)}% · Virality: ${(p.virality_score ?? 0).toFixed(1)}×
                     </div>
-                  </div>
-                `}
+                    ${p.next_action ? `<div style="margin-top:5px;padding:3px 6px;border-left:2px solid ${c};font-size:9px;color:${c};line-height:1.4;white-space:normal;max-width:220px;">${p.next_action}</div>` : ''}
+                  </div>`
+                  }}
 
                   /* Feature 5: click → Hotspot Detection Panel */
                   onPointClick={handlePointClick}

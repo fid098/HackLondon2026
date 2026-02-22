@@ -32,6 +32,22 @@ const actionMap = {
   Conflict: "Draft De-escalation Memo"
 }
 
+// Risk level → display properties
+const RISK = {
+  CRITICAL: { color: '#ef4444', bg: 'rgba(239,68,68,0.10)', border: 'rgba(239,68,68,0.30)', label: 'CRITICAL' },
+  HIGH:     { color: '#f97316', bg: 'rgba(249,115,22,0.10)', border: 'rgba(249,115,22,0.30)', label: 'HIGH' },
+  MEDIUM:   { color: '#f59e0b', bg: 'rgba(245,158,11,0.10)', border: 'rgba(245,158,11,0.30)', label: 'MEDIUM' },
+  LOW:      { color: '#10b981', bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.25)', label: 'LOW' },
+}
+
+// Stability score → gauge fill color (mirrors risk_level thresholds)
+function scoreColor(s) {
+  if (s < 40) return '#ef4444'
+  if (s < 60) return '#f97316'
+  if (s < 80) return '#f59e0b'
+  return '#10b981'
+}
+
 const sectionHeader = {
   fontSize: 9, fontWeight: 700, color: '#334155',
   textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8,
@@ -114,6 +130,81 @@ export default function RightSimulationPanel({
               background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontSize: 16, lineHeight: 1,
             }}>×</button>
           </div>
+
+          {/* ── Reality Stability Intelligence block ── */}
+          {selectedHotspot.reality_score != null && (() => {
+            const score = selectedHotspot.reality_score
+            const risk  = selectedHotspot.risk_level ?? 'MEDIUM'
+            const riskStyle = RISK[risk] ?? RISK.MEDIUM
+            const fillPct = score  // score IS 0-100
+            const col = scoreColor(score)
+            return (
+              <div style={{
+                marginBottom: 9, padding: '9px 10px', borderRadius: 6,
+                background: riskStyle.bg, border: `1px solid ${riskStyle.border}`,
+              }}>
+                {/* Score gauge + risk badge row */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 7 }}>
+                  {/* Circular-ish score badge */}
+                  <div style={{
+                    width: 52, height: 52, borderRadius: '50%', flexShrink: 0,
+                    background: `conic-gradient(${col} ${fillPct * 3.6}deg, rgba(255,255,255,0.06) 0deg)`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: `0 0 14px ${col}44`,
+                    position: 'relative',
+                  }}>
+                    {/* Inner circle (creates ring effect) */}
+                    <div style={{
+                      width: 38, height: 38, borderRadius: '50%',
+                      background: 'rgba(8,12,22,0.95)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <span style={{ fontSize: 14, fontWeight: 900, color: col, lineHeight: 1 }}>{score}</span>
+                    </div>
+                  </div>
+                  {/* Labels */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 8, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 3 }}>
+                      Reality Stability
+                    </p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
+                      <span style={{
+                        fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 4,
+                        background: riskStyle.bg, color: riskStyle.color,
+                        border: `1px solid ${riskStyle.border}`, letterSpacing: '0.05em',
+                      }}>
+                        {risk}
+                      </span>
+                      <span style={{ fontSize: 8, color: '#334155' }}>RISK LEVEL</span>
+                    </div>
+                    {/* Mini score bar */}
+                    <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.06)' }}>
+                      <div style={{
+                        height: '100%', borderRadius: 2,
+                        width: `${fillPct}%`,
+                        background: `linear-gradient(90deg, ${col}, ${col}bb)`,
+                        transition: 'width 0.6s ease',
+                      }} />
+                    </div>
+                  </div>
+                </div>
+                {/* Next action recommendation */}
+                {selectedHotspot.next_action && (
+                  <div style={{
+                    padding: '5px 8px', borderRadius: 4,
+                    background: 'rgba(0,0,0,0.25)', borderLeft: `2px solid ${riskStyle.color}`,
+                  }}>
+                    <p style={{ fontSize: 8, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>
+                      Recommended Action
+                    </p>
+                    <p style={{ fontSize: 10, color: riskStyle.color, fontWeight: 600, lineHeight: 1.4 }}>
+                      {selectedHotspot.next_action}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
 
           {/* Score cards */}
           <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
