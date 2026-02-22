@@ -358,7 +358,7 @@ export default function Heatmap() {
                 borderRadius: 6, padding: '4px 12px',
                 fontSize: 9, fontWeight: 700, color: '#3b82f6', letterSpacing: '0.08em', whiteSpace: 'nowrap',
               }}>
-                {timeRange.toUpperCase()} · HIGH RISK-WEIGHTED
+                {timeRange.toUpperCase()} · {vizMode === 'risk' ? 'RISK-WEIGHTED' : 'VOLUME'}
                 {isPlaying && <span style={{ marginLeft: 8, color: '#ef4444' }}>▶ PLAYING</span>}
               </div>
 

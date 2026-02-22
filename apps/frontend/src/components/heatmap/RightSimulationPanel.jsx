@@ -12,6 +12,7 @@
  *   setMultiCats
  */
 
+import { useState } from 'react'
 import { useSimulation } from '../../hooks/useSimulation'
 
 const CATEGORIES = ['All', 'Health', 'Politics', 'Finance', 'Science', 'Conflict', 'Climate']
@@ -36,8 +37,6 @@ const sectionHeader = {
   textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8,
 }
 const divider = { borderBottom: '1px solid rgba(255,255,255,0.06)' }
-
-import { useState } from 'react'
 
 export default function RightSimulationPanel({
   selectedHotspot, setSelectedHotspot,
