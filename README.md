@@ -38,6 +38,40 @@ docker compose up --build
 # API Docs: http://localhost:8000/docs
 ```
 
+### Running services individually
+
+**Backend**
+
+```bash
+cd apps/backend
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Expected output:
+```
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process using WatchFiles
+INFO:     Starting TruthGuard API (env: development)
+INFO:     MongoDB connection established (db: HackLdn)
+INFO:     Application startup complete.
+```
+
+**Frontend**
+
+```bash
+cd apps/frontend
+npm install
+npm run dev
+```
+
+Expected output:
+```
+  VITE v5.4.21  ready in 505 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://192.168.x.x:5173/
+```
+
 ## Running tests
 
 ```bash

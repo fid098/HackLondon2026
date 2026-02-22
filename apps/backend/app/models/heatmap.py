@@ -139,13 +139,14 @@ class SimulateResponse(BaseModel):
 class StreamEvent(BaseModel):
     """Single frame pushed over the WebSocket stream."""
 
-    type:      str            # "event"
-    message:   str            # human-readable feed entry
-    delta:     int            # count increment since last frame
-    timestamp: str            # ISO-8601
-    severity:  Optional[str] = None   # "high" | "medium" | "low"
-    city:      Optional[str] = None   # originating city label
-    category:  Optional[str] = None   # narrative category
+
+    type: str                      # "event"
+    message: str                   # human-readable feed entry
+    delta: int                     # count increment since last frame
+    timestamp: str                 # ISO-8601
+    severity: Optional[str] = None # "high" | "medium" | "low"
+    city: Optional[str] = None     # originating city label
+    category: Optional[str] = None # narrative category
 
 
 class GeoPoint(BaseModel):
