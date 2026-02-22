@@ -262,6 +262,30 @@ export async function checkScam(payload) {
 }
 
 /**
+ * Trigger a JSON download for a single saved report (browser save dialog).
+ * @param {string} id — MongoDB report _id string
+ */
+export async function downloadReport(id) {
+  const token = getToken()
+  const headers = { Accept: 'application/json' }
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  const res = await fetch(
+    `${BASE_URL}/api/v1/reports/${encodeURIComponent(id)}/download?format=json`,
+    { headers },
+  )
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `report-${id}.json`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+/**
  * Submit thumbs_up / thumbs_down feedback for any report.
  * @param {{ report_id: string, rating: 'thumbs_up'|'thumbs_down', notes?: string }} payload
  * @returns {Promise<{ ok: boolean, id: string }>}

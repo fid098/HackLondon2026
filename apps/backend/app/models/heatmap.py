@@ -139,14 +139,13 @@ class SimulateResponse(BaseModel):
 class StreamEvent(BaseModel):
     """Single frame pushed over the WebSocket stream."""
 
-
-    type: str                      # "event"
-    message: str                   # human-readable feed entry
-    delta: int                     # count increment since last frame
-    timestamp: str                 # ISO-8601
-    severity: Optional[str] = None # "high" | "medium" | "low"
-    city: Optional[str] = None     # originating city label
-    category: Optional[str] = None # narrative category
+    type:      str            # "event"
+    message:   str            # human-readable feed entry
+    delta:     int            # count increment since last frame
+    timestamp: str            # ISO-8601
+    severity:  Optional[str] = None   # "high" | "medium" | "low"
+    city:      Optional[str] = None   # originating city label
+    category:  Optional[str] = None   # narrative category
 
 
 class GeoPoint(BaseModel):
@@ -175,3 +174,69 @@ class HeatmapFlagResponse(BaseModel):
     ok: bool
     id: str | None = None
     event: HeatmapEvent
+
+
+class ArcLocation(BaseModel):
+    """A single city location within a narrative arc."""
+
+    lat: float
+    lng: float
+    city: str
+
+
+class NarrativeArc(BaseModel):
+    """A narrative that has spread to ≥2 cities — used to draw globe arcs."""
+
+    narrative_id: str
+    category: str
+    strength: int            # total event count across all cities
+    locations: list[ArcLocation]
+
+
+# ── Atlas Vector Search + Aggregation models ──────────────────────────────────
+
+class TrendPoint(BaseModel):
+    """One hourly bucket in the event count time series."""
+
+    hour: str            # ISO-8601 string, e.g. "2026-02-22T14:00:00Z"
+    count: int           # total event count in that hour
+    category: Optional[str] = None   # None when aggregated across all categories
+
+
+class CategoryBreakdown(BaseModel):
+    """Per-category aggregated statistics."""
+
+    category: str
+    total_events: int
+    city_count: int        # distinct cities affected
+    top_severity: str      # "high" | "medium" | "low" (worst seen in window)
+
+
+class SearchRequest(BaseModel):
+    """Request body for POST /api/v1/heatmap/search (vector search)."""
+
+    query: str = Field(..., min_length=3, max_length=500,
+                       description="Natural-language search query")
+    category: Optional[str] = Field(
+        default=None,
+        description="Restrict results to this category (omit for all)",
+    )
+    limit: int = Field(default=5, ge=1, le=20,
+                       description="Maximum number of results to return")
+    collection: str = Field(
+        default="narratives",
+        description="Which collection to search: 'narratives' or 'events'",
+    )
+
+
+class SearchResult(BaseModel):
+    """A single result from a vector search query."""
+
+    id: str                          # MongoDB _id (stringified)
+    title: str                       # narrative title or event label
+    category: str
+    score: float                     # cosine similarity [0.0 – 1.0]
+    volume: Optional[int] = None     # narrative volume (narratives only)
+    trend: Optional[str] = None      # "up" | "down" | "same"
+    region: Optional[str] = None     # region label (events only)
+    severity: Optional[str] = None   # severity (events only)

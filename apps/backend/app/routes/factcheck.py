@@ -166,32 +166,11 @@ async def factcheck(
 
     now = datetime.now(tz=timezone.utc)
 
-    # ── 5. Persist to MongoDB (best-effort) ───────────────────────────────────
-    report_id: Optional[str] = None
-
-    if db is not None:
-        try:
-            doc = {
-                "source_type":  payload.source_type,
-                "source_ref":   source_ref,
-                "verdict":      result.verdict,
-                "confidence":   result.confidence,
-                "summary":      result.summary,
-                "pro_points":   result.pro_points,
-                "con_points":   result.con_points,
-                "sources":      [s.model_dump() for s in sources],
-                "category":     result.category,
-                "debate":       debate_artifact.model_dump(),
-                "created_at":   now,
-                "user_id":      user_id,
-            }
-            ins = await db["reports"].insert_one(doc)
-            report_id = str(ins.inserted_id)
-        except Exception as exc:
-            logger.warning("Failed to persist report to MongoDB: %s", exc)
-
-    if not report_id:
-        report_id = str(ObjectId())  # ephemeral ID for non-persisted reports
+    # ── 5. Generate ephemeral ID — user must click "Save to Reports" to persist ─
+    # The factcheck pipeline intentionally does NOT auto-save to MongoDB.
+    # The frontend prompts the user after showing the result; they call
+    # POST /api/v1/reports only if they want to keep it.
+    report_id = str(ObjectId())
 
     # ── 6. Build response ─────────────────────────────────────────────────────
     report_out = ReportOut(
