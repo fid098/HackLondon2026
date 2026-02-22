@@ -54,6 +54,24 @@ const sectionHeader = {
 }
 const divider = { borderBottom: '1px solid rgba(255,255,255,0.06)' }
 
+// Category → pill colour for the narratives table
+const CAT_PILL_COLOR = {
+  Health:   { bg: 'rgba(239,68,68,0.12)',   color: '#f87171', border: 'rgba(239,68,68,0.25)'   },
+  Politics: { bg: 'rgba(249,115,22,0.12)',  color: '#fb923c', border: 'rgba(249,115,22,0.25)'  },
+  Finance:  { bg: 'rgba(234,179,8,0.12)',   color: '#facc15', border: 'rgba(234,179,8,0.25)'   },
+  Science:  { bg: 'rgba(59,130,246,0.12)',  color: '#60a5fa', border: 'rgba(59,130,246,0.25)'  },
+  Conflict: { bg: 'rgba(239,68,68,0.12)',   color: '#f87171', border: 'rgba(239,68,68,0.25)'   },
+  Climate:  { bg: 'rgba(16,185,129,0.12)',  color: '#34d399', border: 'rgba(16,185,129,0.25)'  },
+}
+
+// Synthetic threat level derived from narrative volume + trend direction
+function narrativeThreat(n) {
+  if (n.volume > 10000) return 'CRITICAL'
+  if (n.volume > 6000 || n.trend === 'up') return 'HIGH'
+  if (n.volume > 3000) return 'MEDIUM'
+  return 'LOW'
+}
+
 export default function RightSimulationPanel({
   selectedHotspot, setSelectedHotspot,
   multiCats, toggleCat, catActive,
@@ -378,37 +396,69 @@ export default function RightSimulationPanel({
           <p style={{ fontSize: 11, color: '#1e293b', padding: '24px 0', textAlign: 'center' }}>
             No narratives in this category.
           </p>
-        ) : filteredNarratives.map(n => (
-          <div key={n.rank} style={{
-            padding: '9px 0', borderBottom: '1px solid rgba(255,255,255,0.04)',
-            display: 'flex', gap: 10, alignItems: 'flex-start',
-          }}>
-            <span style={{ fontSize: 10, color: '#1e293b', fontFamily: 'monospace', flexShrink: 0, width: 14, paddingTop: 1 }}>
-              {n.rank}
-            </span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontSize: 11, color: '#64748b', lineHeight: 1.45, marginBottom: 5 }}>{n.title}</p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                <span style={{
-                  fontSize: 9, padding: '1px 6px', borderRadius: 3,
-                  background: 'rgba(255,255,255,0.04)', color: '#334155',
-                  border: '1px solid rgba(255,255,255,0.06)',
-                }}>
-                  {n.category}
+        ) : (() => {
+          const maxVol = Math.max(...filteredNarratives.map(n => n.volume), 1)
+          return filteredNarratives.map(n => {
+            const threat = narrativeThreat(n)
+            const tStyle = RISK[threat] ?? RISK.MEDIUM
+            const catSty = CAT_PILL_COLOR[n.category] ?? {
+              bg: 'rgba(255,255,255,0.06)', color: '#64748b', border: 'rgba(255,255,255,0.10)',
+            }
+            const volPct = Math.round((n.volume / maxVol) * 100)
+            return (
+              <div key={n.rank} style={{
+                padding: '9px 0', borderBottom: '1px solid rgba(255,255,255,0.04)',
+                display: 'flex', gap: 8, alignItems: 'flex-start',
+              }}>
+                {/* Rank */}
+                <span style={{ fontSize: 10, color: '#1e293b', fontFamily: 'monospace', flexShrink: 0, width: 14, paddingTop: 1 }}>
+                  {n.rank}
                 </span>
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#334155', fontFamily: 'monospace' }}>
-                  {(n.volume / 1000).toFixed(1)}k
-                </span>
-                <span style={{
-                  fontSize: 12, fontWeight: 700,
-                  color: n.trend === 'up' ? '#ef4444' : n.trend === 'down' ? '#10b981' : '#334155',
-                }}>
-                  {n.trend === 'up' ? '↑' : n.trend === 'down' ? '↓' : '–'}
-                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {/* Title */}
+                  <p style={{ fontSize: 11, color: '#64748b', lineHeight: 1.45, marginBottom: 5 }}>{n.title}</p>
+                  {/* Meta row */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5, flexWrap: 'wrap' }}>
+                    {/* Category pill */}
+                    <span style={{
+                      fontSize: 8, padding: '1px 6px', borderRadius: 3, fontWeight: 700,
+                      background: catSty.bg, color: catSty.color, border: `1px solid ${catSty.border}`,
+                    }}>
+                      {n.category}
+                    </span>
+                    {/* Threat badge */}
+                    <span style={{
+                      fontSize: 8, padding: '1px 6px', borderRadius: 3, fontWeight: 800,
+                      background: tStyle.bg, color: tStyle.color, border: `1px solid ${tStyle.border}`,
+                      letterSpacing: '0.04em',
+                    }}>
+                      {threat}
+                    </span>
+                    {/* Volume */}
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#475569', fontFamily: 'monospace' }}>
+                      {(n.volume / 1000).toFixed(1)}k
+                    </span>
+                    {/* Trend arrow */}
+                    <span style={{
+                      fontSize: 12, fontWeight: 700, marginLeft: 'auto',
+                      color: n.trend === 'up' ? '#ef4444' : n.trend === 'down' ? '#10b981' : '#334155',
+                    }}>
+                      {n.trend === 'up' ? '↑' : n.trend === 'down' ? '↓' : '–'}
+                    </span>
+                  </div>
+                  {/* Relative volume bar */}
+                  <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.05)' }}>
+                    <div style={{
+                      height: '100%', borderRadius: 2, width: `${volPct}%`,
+                      background: `linear-gradient(90deg, ${tStyle.color}, ${tStyle.color}88)`,
+                      transition: 'width 0.6s ease',
+                    }} />
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        ))}
+            )
+          })
+        })()}
       </div>
 
       {/* ── Footer ── */}

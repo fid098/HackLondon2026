@@ -100,6 +100,19 @@ function getDisplayCount(spot, vizMode, timeRange) {
 
 /* panelBg and divider moved to panel components */
 
+// Category pill colours used in the live AI feed
+const FEED_CAT_COLOR = {
+  Health:   { bg: 'rgba(239,68,68,0.10)',  color: '#f87171', border: 'rgba(239,68,68,0.22)'  },
+  Politics: { bg: 'rgba(249,115,22,0.10)', color: '#fb923c', border: 'rgba(249,115,22,0.22)' },
+  Finance:  { bg: 'rgba(234,179,8,0.10)',  color: '#facc15', border: 'rgba(234,179,8,0.22)'  },
+  Science:  { bg: 'rgba(59,130,246,0.10)', color: '#60a5fa', border: 'rgba(59,130,246,0.22)' },
+  Conflict: { bg: 'rgba(239,68,68,0.10)',  color: '#f87171', border: 'rgba(239,68,68,0.22)'  },
+  Climate:  { bg: 'rgba(16,185,129,0.10)', color: '#34d399', border: 'rgba(16,185,129,0.22)' },
+}
+
+// Short action prefix label per risk level (mirrors computeNextAction prefixes)
+const FEED_ACTION = { CRITICAL: 'ESCALATE', HIGH: 'ALERT', MEDIUM: 'MONITOR', LOW: 'LOG' }
+
 /* ─── Component ──────────────────────────────────────────────────────────── */
 
 export default function Heatmap() {
@@ -632,38 +645,89 @@ export default function Heatmap() {
               ref={feedRef}
               style={{ flex: 1, overflowY: 'auto', padding: '4px 18px', display: 'flex', flexDirection: 'column', gap: 4 }}
             >
-              {feedHistory.map(entry => (
-                <div key={entry.id} style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                  <span style={{ fontSize: 9, color: '#1e293b', fontFamily: 'monospace', flexShrink: 0, width: 56 }}>{entry.time}</span>
-                  <span style={{
-                    fontSize: 8, padding: '1px 5px', borderRadius: 2, flexShrink: 0, fontWeight: 700,
-                    background: entry.sev === 'high' ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.12)',
-                    color: entry.sev === 'high' ? '#ef4444' : '#f59e0b',
+              {feedHistory.map((entry, idx) => {
+                const isNew  = idx === feedHistory.length - 1
+                const risk   = entry.sev === 'critical' ? 'CRITICAL'
+                             : entry.sev === 'high'     ? 'HIGH'
+                             : entry.sev === 'low'      ? 'LOW'
+                             : 'MEDIUM'
+                const rCol   = RISK_COLOR[risk]
+                const catSty = FEED_CAT_COLOR[entry.category] ?? {
+                  bg: 'rgba(255,255,255,0.04)', color: '#64748b', border: 'rgba(255,255,255,0.08)',
+                }
+                return (
+                  <div key={entry.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0,
+                    padding: '3px 6px 3px 8px', borderRadius: 4,
+                    borderLeft: `2px solid ${rCol}`,
+                    background: isNew ? `${rCol}0d` : 'transparent',
                   }}>
-                    {entry.sev.toUpperCase()}
-                  </span>
-                  <span style={{ fontSize: 9, color: '#475569', fontWeight: 600, flexShrink: 0 }}>[AI]</span>
-                  <span style={{ fontSize: 10, color: '#64748b' }}>{entry.msg}</span>
-                  {entry.city && entry.city !== '—' && (
-                    <>
-                      <span style={{ fontSize: 9, color: '#1e293b', flexShrink: 0 }}>→</span>
-                      <span style={{ fontSize: 9, color: '#334155', fontWeight: 600, flexShrink: 0 }}>{entry.city}</span>
-                    </>
-                  )}
-                  {entry.category && entry.category !== 'Unknown' && (
-                    <span style={{
-                      fontSize: 8, padding: '1px 5px', borderRadius: 2, flexShrink: 0,
-                      background: 'rgba(255,255,255,0.04)', color: '#334155',
-                      border: '1px solid rgba(255,255,255,0.06)',
-                    }}>
-                      {entry.category}
+                    {/* Timestamp */}
+                    <span style={{ fontSize: 9, color: '#1e293b', fontFamily: 'monospace', flexShrink: 0, width: 52 }}>
+                      {entry.time}
                     </span>
-                  )}
-                </div>
-              ))}
+                    {/* Risk badge */}
+                    <span style={{
+                      fontSize: 8, padding: '1px 5px', borderRadius: 3, flexShrink: 0, fontWeight: 800,
+                      background: `${rCol}18`, color: rCol, letterSpacing: '0.04em',
+                    }}>
+                      {risk}
+                    </span>
+                    {/* Action chip */}
+                    <span style={{
+                      fontSize: 7, padding: '1px 5px', borderRadius: 3, flexShrink: 0, fontWeight: 700,
+                      background: 'rgba(255,255,255,0.04)', color: '#334155',
+                      border: '1px solid rgba(255,255,255,0.07)', letterSpacing: '0.06em',
+                    }}>
+                      {FEED_ACTION[risk]}
+                    </span>
+                    {/* Message */}
+                    <span style={{
+                      fontSize: 10, color: '#64748b', flex: 1, minWidth: 0,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {entry.msg}
+                    </span>
+                    {/* City chip */}
+                    {entry.city && entry.city !== '—' && (
+                      <span style={{
+                        fontSize: 9, color: '#475569', fontWeight: 600, flexShrink: 0,
+                        padding: '1px 5px', borderRadius: 3, background: 'rgba(255,255,255,0.04)',
+                      }}>
+                        {entry.city}
+                      </span>
+                    )}
+                    {/* Category pill */}
+                    {entry.category && entry.category !== 'Unknown' && (
+                      <span style={{
+                        fontSize: 8, padding: '1px 6px', borderRadius: 3, flexShrink: 0, fontWeight: 600,
+                        background: catSty.bg, color: catSty.color, border: `1px solid ${catSty.border}`,
+                      }}>
+                        {entry.category}
+                      </span>
+                    )}
+                    {/* NEW flash on most-recent entry */}
+                    {isNew && (
+                      <span style={{
+                        fontSize: 7, fontWeight: 800, color: '#3b82f6', flexShrink: 0,
+                        animation: 'feedPulse 3s ease-out forwards', letterSpacing: '0.06em',
+                      }}>
+                        NEW
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
               {feedHistory.length === 0 && (
                 <p style={{ fontSize: 10, color: '#1e293b', padding: '8px 0' }}>Connecting to event stream…</p>
               )}
+              <style>{`
+                @keyframes feedPulse {
+                  0%   { opacity: 1; }
+                  60%  { opacity: 1; }
+                  100% { opacity: 0; }
+                }
+              `}</style>
             </div>
           </div>
 
