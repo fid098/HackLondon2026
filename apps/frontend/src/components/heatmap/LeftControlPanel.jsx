@@ -30,14 +30,35 @@ const SEV = {
   low:    { ring: '#10b981', label: 'Low'    },
 }
 
-const MOCK_ALERTS = [
-  { id: 1, type: 'coordinated', city: 'Moscow',   msg: 'Coordinated campaign — 94% confidence', sev: 'high',   time: '1m ago'  },
-  { id: 2, type: 'spike',       city: 'London',   msg: 'Spike anomaly: +187% vs 7-day baseline', sev: 'high',   time: '3m ago'  },
-  { id: 3, type: 'coordinated', city: 'Beijing',  msg: 'Coordinated amplification detected',     sev: 'high',   time: '6m ago'  },
-  { id: 4, type: 'spike',       city: 'Delhi',    msg: 'Event surge: +145% in last hour',        sev: 'medium', time: '11m ago' },
-  { id: 5, type: 'coordinated', city: 'Tehran',   msg: 'State-linked network activity',          sev: 'high',   time: '14m ago' },
-  { id: 6, type: 'spike',       city: 'New York', msg: 'Health narrative spike detected',        sev: 'medium', time: '22m ago' },
-]
+// Dynamic alerts derived from real globeSpots (see buildAlerts() below).
+// MOCK_ALERTS removed — alerts now come from enriched hotspot data.
+
+// Risk level → bar/badge color
+const RISK_COLOR = {
+  CRITICAL: '#ef4444',
+  HIGH:     '#f97316',
+  MEDIUM:   '#f59e0b',
+  LOW:      '#10b981',
+}
+
+// Build an alert list from enriched hotspots
+function buildAlerts(globeSpots) {
+  return globeSpots
+    .filter(s => s.isCoordinated || s.isSpikeAnomaly || s.risk_level === 'CRITICAL')
+    .sort((a, b) => (a.reality_score ?? 50) - (b.reality_score ?? 50)) // worst first
+    .slice(0, 6)
+    .map((s, i) => ({
+      id: i,
+      type: s.isCoordinated ? 'coordinated' : 'spike',
+      city: s.label,
+      // Use computed next_action if available, otherwise fall back to a generic message
+      msg: s.next_action
+        ? s.next_action.replace(/^[A-Z]+:\s*/, '')  // strip prefix like "DEPLOY: "
+        : s.isSpikeAnomaly ? `Spike anomaly — ${s.category}` : `Coordinated activity — ${s.category}`,
+      sev: s.severity,
+      riskLevel: s.risk_level ?? (s.severity === 'high' ? 'HIGH' : 'MEDIUM'),
+    }))
+}
 
 const sectionHeader = {
   fontSize: 9, fontWeight: 700, color: '#334155',
@@ -128,11 +149,16 @@ export default function LeftControlPanel({
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
-                <span style={{
-                  width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                  background: SEV[spot.severity].ring,
-                  boxShadow: `0 0 ${spot.isCoordinated || spot.isSpikeAnomaly ? '8px' : '4px'} ${SEV[spot.severity].ring}`,
-                }} />
+                {(() => {
+                  const dotCol = spot.risk_level ? (RISK_COLOR[spot.risk_level] ?? SEV[spot.severity]?.ring) : SEV[spot.severity]?.ring ?? '#60a5fa'
+                  return (
+                    <span style={{
+                      width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                      background: dotCol,
+                      boxShadow: `0 0 ${spot.isCoordinated || spot.isSpikeAnomaly ? '8px' : '4px'} ${dotCol}`,
+                    }} />
+                  )
+                })()}
                 <span style={{ fontSize: 11, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {spot.label}
                 </span>
@@ -143,7 +169,10 @@ export default function LeftControlPanel({
                   <span style={{ fontSize: 7, padding: '1px 3px', borderRadius: 2, background: 'rgba(245,158,11,0.15)', color: '#f59e0b', fontWeight: 700, flexShrink: 0 }}>⚡</span>
                 )}
               </div>
-              <span style={{ fontSize: 10, fontWeight: 700, color: SEV[spot.severity].ring, fontFamily: 'monospace', flexShrink: 0, marginLeft: 4 }}>
+              <span style={{
+                fontSize: 10, fontWeight: 700, fontFamily: 'monospace', flexShrink: 0, marginLeft: 4,
+                color: spot.risk_level ? (RISK_COLOR[spot.risk_level] ?? SEV[spot.severity]?.ring) : SEV[spot.severity]?.ring ?? '#60a5fa',
+              }}>
                 {spot.displayCount.toLocaleString()}
               </span>
             </div>
@@ -154,55 +183,87 @@ export default function LeftControlPanel({
         </div>
       </div>
 
-      {/* ── Region activity bars ── */}
+      {/* ── Region activity bars (sorted worst stability first) ── */}
       <div style={{ padding: '10px 15px', ...divider }}>
         <p style={sectionHeader}>Region Activity</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {regions.map(r => (
-            <div key={r.name}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                <span style={{ fontSize: 10, color: '#475569' }}>{r.name}</span>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <span style={{ fontSize: 9, fontWeight: 700, color: SEV[r.severity].ring }}>{r.events.toLocaleString()}</span>
-                  <span style={{ fontSize: 9, color: r.delta >= 0 ? '#ef4444' : '#10b981' }}>
-                    {r.delta >= 0 ? `+${r.delta}` : r.delta}%
-                  </span>
+          {[...regions]
+            .sort((a, b) => (a.reality_score ?? 50) - (b.reality_score ?? 50))
+            .map(r => {
+              const barColor = r.risk_level ? (RISK_COLOR[r.risk_level] ?? SEV[r.severity]?.ring) : SEV[r.severity]?.ring ?? '#60a5fa'
+              const hasScore = r.reality_score != null
+              return (
+                <div key={r.name}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <span style={{ fontSize: 10, color: '#475569' }}>{r.name}</span>
+                      {r.risk_level && (
+                        <span style={{
+                          fontSize: 7, padding: '1px 4px', borderRadius: 2, fontWeight: 700,
+                          color: barColor, background: `${barColor}18`, letterSpacing: '0.04em',
+                        }}>
+                          {r.risk_level}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      {hasScore && (
+                        <span style={{ fontSize: 9, fontWeight: 700, color: barColor, fontFamily: 'monospace' }}>
+                          {r.reality_score}
+                        </span>
+                      )}
+                      <span style={{ fontSize: 9, color: r.delta >= 0 ? '#ef4444' : '#10b981' }}>
+                        {r.delta >= 0 ? `+${r.delta}` : r.delta}%
+                      </span>
+                    </div>
+                  </div>
+                  {/* Stability bar — fill represents reality_score (higher = more stable = wider) */}
+                  <div style={{ height: 2, borderRadius: 1, background: 'rgba(255,255,255,0.05)' }}>
+                    <div style={{
+                      height: '100%', borderRadius: 1,
+                      background: barColor,
+                      width: hasScore ? `${r.reality_score}%` : `${Math.min(100, (r.events / 1300) * 100)}%`,
+                      boxShadow: `0 0 4px ${barColor}`,
+                      transition: 'width 0.7s ease',
+                    }} />
+                  </div>
                 </div>
-              </div>
-              <div style={{ height: 2, borderRadius: 1, background: 'rgba(255,255,255,0.05)' }}>
-                <div style={{
-                  height: '100%', borderRadius: 1, background: SEV[r.severity].ring,
-                  width: `${Math.min(100, (r.events / 1300) * 100)}%`,
-                  boxShadow: `0 0 4px ${SEV[r.severity].ring}`, transition: 'width 0.7s ease',
-                }} />
-              </div>
-            </div>
-          ))}
+              )
+            })}
         </div>
       </div>
 
-      {/* ── Active alerts ── */}
-      <div style={{ padding: '10px 15px', ...divider }}>
-        <p style={{ ...sectionHeader, color: '#ef4444' }}>⚠ Active Alerts ({MOCK_ALERTS.length})</p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {MOCK_ALERTS.map(a => (
-            <div key={a.id} style={{
-              padding: '6px 8px', borderRadius: 5,
-              background: a.sev === 'high' ? 'rgba(239,68,68,0.07)' : 'rgba(245,158,11,0.06)',
-              border: `1px solid ${a.sev === 'high' ? 'rgba(239,68,68,0.18)' : 'rgba(245,158,11,0.18)'}`,
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-                <span style={{ fontSize: 9, fontWeight: 800, color: a.sev === 'high' ? '#ef4444' : '#f59e0b', textTransform: 'uppercase' }}>
-                  {a.type === 'coordinated' ? '⚡ Coordinated' : '↑ Spike'}
-                </span>
-                <span style={{ fontSize: 9, color: '#1e293b' }}>{a.time}</span>
-              </div>
-              <p style={{ fontSize: 10, color: '#475569', lineHeight: 1.4 }}>{a.msg}</p>
-              <p style={{ fontSize: 9, color: '#334155', marginTop: 2 }}>{a.city}</p>
+      {/* ── Active alerts (derived from real enriched hotspot data) ── */}
+      {(() => {
+        const alerts = buildAlerts(globeSpots)
+        if (!alerts.length) return null
+        return (
+          <div style={{ padding: '10px 15px', ...divider }}>
+            <p style={{ ...sectionHeader, color: '#ef4444' }}>⚠ Active Alerts ({alerts.length})</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {alerts.map(a => {
+                const col = RISK_COLOR[a.riskLevel] ?? '#ef4444'
+                return (
+                  <div key={a.id} style={{
+                    padding: '6px 8px', borderRadius: 5,
+                    background: `${col}0d`,
+                    border: `1px solid ${col}30`,
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                      <span style={{ fontSize: 9, fontWeight: 800, color: col, textTransform: 'uppercase' }}>
+                        {a.type === 'coordinated' ? '⚡ Coordinated' : '↑ Spike'} · {a.riskLevel}
+                      </span>
+                      <span style={{ fontSize: 8, color: '#1e293b', padding: '1px 4px', borderRadius: 2, background: `${col}18` }}>LIVE</span>
+                    </div>
+                    <p style={{ fontSize: 10, color: '#475569', lineHeight: 1.4, marginBottom: 2 }}>{a.msg}</p>
+                    <p style={{ fontSize: 9, color: col, fontWeight: 600 }}>{a.city}</p>
+                  </div>
+                )
+              })}
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
+        )
+      })()}
 
       {/* ── Agent Log ── */}
       <div style={{ padding: '10px 15px', ...divider }}>

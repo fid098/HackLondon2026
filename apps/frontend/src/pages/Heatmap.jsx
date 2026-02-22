@@ -309,6 +309,24 @@ export default function Heatmap() {
     : globeSpots.some(s => s.severity === 'medium') ? 'MEDIUM' : 'LOW'
   const maxSevColor = maxSeverity === 'HIGH' ? '#ef4444' : maxSeverity === 'MEDIUM' ? '#f59e0b' : '#10b981'
 
+  /* ── Global Reality Stability Score ───────────────────────────────────────
+   * Weighted average of all region reality_scores (populated by intelligenceProvider).
+   * Drives the top-bar gauge and the global risk level badge.
+   */
+  const globalStabilityScore = useMemo(() => {
+    const scored = regions.filter(r => r.reality_score != null)
+    if (!scored.length) return null
+    return Math.round(scored.reduce((s, r) => s + r.reality_score, 0) / scored.length)
+  }, [regions])
+
+  const globalRiskLevel = useMemo(() => {
+    if (globalStabilityScore == null) return maxSeverity
+    if (globalStabilityScore < 40) return 'CRITICAL'
+    if (globalStabilityScore < 60) return 'HIGH'
+    if (globalStabilityScore < 80) return 'MEDIUM'
+    return 'LOW'
+  }, [globalStabilityScore, maxSeverity])
+
   /* ── Render ── */
   return (
     <SimulationProvider>
@@ -327,6 +345,8 @@ export default function Heatmap() {
           maxSeverity={maxSeverity}
           maxSevColor={maxSevColor}
           totalEvents={totalEvents}
+          globalStabilityScore={globalStabilityScore}
+          globalRiskLevel={globalRiskLevel}
         />
 
         {/* ══════════════════════ MAIN CONTENT ══════════════════════ */}

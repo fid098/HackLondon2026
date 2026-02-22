@@ -2,16 +2,39 @@
  * TopControlBar.jsx — Agentic Command Center top bar.
  *
  * Props:
- *   vizMode       string   'volume' | 'risk'
- *   setVizMode    fn
- *   now           Date
- *   maxSeverity   string   'HIGH' | 'MEDIUM' | 'LOW'
- *   maxSevColor   string   hex
- *   totalEvents   number
+ *   vizMode               string   'volume' | 'risk'
+ *   setVizMode            fn
+ *   now                   Date
+ *   maxSeverity           string   'HIGH' | 'MEDIUM' | 'LOW'   (legacy, kept for fallback)
+ *   maxSevColor           string   hex                          (legacy, kept for fallback)
+ *   totalEvents           number
+ *   globalStabilityScore  number|null   0–100 weighted-average of region reality_scores
+ *   globalRiskLevel       string        'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
  */
 
-export default function TopControlBar({ vizMode, setVizMode, now, maxSeverity, maxSevColor, totalEvents }) {
+const RISK_STYLE = {
+  CRITICAL: { color: '#ef4444', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.35)' },
+  HIGH:     { color: '#f97316', bg: 'rgba(249,115,22,0.12)', border: 'rgba(249,115,22,0.35)' },
+  MEDIUM:   { color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.35)' },
+  LOW:      { color: '#10b981', bg: 'rgba(16,185,129,0.10)', border: 'rgba(16,185,129,0.30)' },
+}
+
+function stabilityColor(score) {
+  if (score == null) return '#475569'
+  if (score < 40) return '#ef4444'
+  if (score < 60) return '#f97316'
+  if (score < 80) return '#f59e0b'
+  return '#10b981'
+}
+
+export default function TopControlBar({
+  vizMode, setVizMode, now, maxSeverity, maxSevColor, totalEvents,
+  globalStabilityScore, globalRiskLevel,
+}) {
   const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  const riskKey  = globalRiskLevel ?? maxSeverity
+  const rStyle   = RISK_STYLE[riskKey] ?? RISK_STYLE.HIGH
+  const stabCol  = stabilityColor(globalStabilityScore)
 
   return (
     <div style={{
@@ -82,13 +105,39 @@ export default function TopControlBar({ vizMode, setVizMode, now, maxSeverity, m
           ))}
         </div>
 
-        {/* Risk badge */}
+        {/* Global Stability gauge */}
         <div style={{
-          padding: '3px 10px', borderRadius: 5,
-          background: `${maxSevColor}18`, border: `1px solid ${maxSevColor}50`,
-          fontSize: 10, fontWeight: 800, color: maxSevColor, letterSpacing: '0.08em',
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '4px 11px', borderRadius: 6,
+          background: rStyle.bg, border: `1px solid ${rStyle.border}`,
         }}>
-          RISK: {maxSeverity}
+          {/* Score circle */}
+          <div style={{
+            width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+            background: `conic-gradient(${stabCol} ${(globalStabilityScore ?? 0) * 3.6}deg, rgba(255,255,255,0.07) 0deg)`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <div style={{
+              width: 18, height: 18, borderRadius: '50%',
+              background: 'rgba(4,7,15,0.95)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <span style={{ fontSize: 7, fontWeight: 900, color: stabCol, lineHeight: 1 }}>
+                {globalStabilityScore ?? '—'}
+              </span>
+            </div>
+          </div>
+          {/* Labels */}
+          <div>
+            <p style={{ fontSize: 7, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>
+              Global Stability
+            </p>
+            <span style={{
+              fontSize: 9, fontWeight: 800, color: rStyle.color, letterSpacing: '0.05em',
+            }}>
+              {riskKey}
+            </span>
+          </div>
         </div>
 
         {/* Clock */}
