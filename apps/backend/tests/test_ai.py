@@ -66,7 +66,8 @@ class TestGeminiClientMockMode:
     @pytest.mark.asyncio
     async def test_deepfake_image_response_key(self):
         result = await self.client.generate("image check", response_key="deepfake_image")
-        assert "is_deepfake" in result
+        # CNN deepfake detector uses is_fake internally; route maps it to is_deepfake
+        assert "is_fake" in result
 
 
 # ─── SerperAdapter ────────────────────────────────────────────────────────────
