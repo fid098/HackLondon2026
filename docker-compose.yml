@@ -51,7 +51,6 @@ services:
       ENVIRONMENT: development
       MONGO_URI: mongodb://root:devpassword@mongo:27017/truthguard?authSource=admin
       MONGO_DB_NAME: truthguard
-      AI_MOCK_MODE: "true"
       CORS_ORIGINS_STR: "http://localhost:5173,http://localhost:3000"
     env_file:
       # Optional: override env vars locally (see apps/backend/.env.example)

@@ -334,3 +334,80 @@ variable by passing it through `vite.config.ts`:
 ```ts
 define: { 'import.meta.env.VITE_API_URL': JSON.stringify(process.env.VITE_API_URL) }
 ```
+
+---
+
+## Red-Flag Feature Spec (New)
+
+### Goal
+Add a "silent by default" browser-extension mode called **Red-Flag** that runs in the background on:
+- YouTube
+- X / Twitter
+- TikTok
+- Instagram (web)
+- Telegram (web)
+
+The user should not need extra actions for baseline protection. The extension should scan visible content, only show minimal warnings when risk is high, and offer an optional deep-dive report on click.
+
+### Feature A - Real-time deepfake video detection (GenConViT)
+Use a lightweight frame-sampling pipeline in the content script and perform model inference on the backend:
+
+1. Detect active video elements on supported platforms.
+2. Sample frames periodically (for example every 2 to 3 seconds, capped).
+3. Send compressed frame data to background worker.
+4. Background calls backend deepfake endpoint.
+5. Backend runs GenConViT and returns:
+   - `deepfake_score` (0-1)
+   - `label` (`REAL` or `SUSPECTED_FAKE`)
+   - `confidence`
+   - `explainability` (top signals)
+6. Content script shows a low-noise badge only when score passes threshold.
+
+Actual endpoint used (frames are JPEG images, so the image endpoint is correct):
+```http
+POST /api/v1/deepfake/image
+Content-Type: application/json
+
+{
+  "image_b64": "<base64-encoded JPEG frame>",
+  "filename": "youtube-frame.jpg"
+}
+```
+Response: `{ "is_deepfake": bool, "confidence": float 0-1, "reasoning": string }`
+
+### Feature B - Misinformation cross-check with trusted sources
+When text claims are detected from posts/news headlines:
+
+1. Extract claim-like text from DOM.
+2. Send text to `/api/v1/triage` for quick classification.
+3. If confidence/risk is high, escalate to `/api/v1/factcheck`.
+4. Backend cross-checks against trusted sources via:
+   - Serper search results
+   - Google Fact Check API (if key exists)
+   - Debate pipeline synthesis (Gemini Pro judge verdict)
+5. Return:
+   - verdict (`TRUE/FALSE/MISLEADING/UNVERIFIED`)
+   - trusted source links
+   - short reason users can understand quickly
+
+### UI behavior (important)
+- Default experience is unobtrusive: small badge or dot marker.
+- No modal spam while scrolling.
+- Clicking a badge opens:
+  - summary
+  - confidence
+  - source links
+  - "Open full report" action
+
+### Implementation checklist for Fidel
+1. ✅ Add platform selectors for TikTok and Telegram Web in `apps/extension/src/content/utils.ts`.
+2. ✅ Add video-frame sampling module in `apps/extension/src/content/index.ts`.
+3. ✅ Add background message route for deepfake frame analysis in `apps/extension/src/background/index.ts`.
+4. ✅ Add popup switch: `Background Protection (Red-Flag)` in `apps/extension/src/popup/Popup.tsx`.
+5. ✅ Add deepfake API call with 10 s timeout (prevents video element pending-lock from never releasing).
+6. Add tests for:
+   - ✅ selector detection (`getPostSelector`, `getVideoSelector`)
+   - frame sampling throttle (`shouldSampleVideo`, `_videoSampleTimes`)
+   - message flow content → background → API
+7. ✅ Add clear disclaimer text in popup:
+   - "AI assessment is probabilistic, not guaranteed."

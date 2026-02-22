@@ -46,6 +46,7 @@ import SearchBar from '../components/common/SearchBar'
 import GlobeLegend from '../components/common/GlobeLegend'
 import RegionIntelPanel from '../components/heatmap/RegionIntelPanel'
 
+
 /* ─── Constants ──────────────────────────────────────────────────────────── */
 
 

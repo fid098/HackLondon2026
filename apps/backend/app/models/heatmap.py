@@ -42,9 +42,13 @@ The lat/lng fields in HeatmapEvent can then be populated directly from
 `coordinates[1]` and `coordinates[0]` in the aggregation $project stage.
 """
 
+<<<<<<< HEAD
 from typing import Optional
 
 from pydantic import BaseModel
+=======
+from pydantic import BaseModel, Field
+>>>>>>> origin/main
 
 
 class HeatmapEvent(BaseModel):
@@ -139,6 +143,7 @@ class SimulateResponse(BaseModel):
 class StreamEvent(BaseModel):
     """Single frame pushed over the WebSocket stream."""
 
+<<<<<<< HEAD
     type:      str            # "event"
     message:   str            # human-readable feed entry
     delta:     int            # count increment since last frame
@@ -146,3 +151,37 @@ class StreamEvent(BaseModel):
     severity:  Optional[str] = None   # "high" | "medium" | "low"
     city:      Optional[str] = None   # originating city label
     category:  Optional[str] = None   # narrative category
+=======
+    type: str             # "event"
+    message: str          # human-readable feed entry
+    delta: int            # count increment since last frame
+    timestamp: str        # ISO-8601
+
+
+class GeoPoint(BaseModel):
+    """Lat/lng coordinates from user-reported flags."""
+
+    lat: float = Field(..., ge=-90, le=90)
+    lng: float = Field(..., ge=-180, le=180)
+
+
+class HeatmapFlagRequest(BaseModel):
+    """
+    Payload sent by the extension when a user flags suspected AI content.
+    """
+
+    source_url: str = Field(..., min_length=5, max_length=3000)
+    platform: str = Field(default="web", min_length=2, max_length=50)
+    category: str = Field(default="Deepfake", min_length=2, max_length=50)
+    reason: str = Field(default="user_suspected_ai_video", min_length=3, max_length=200)
+    confidence: int | None = Field(default=None, ge=0, le=100)
+    location: GeoPoint | None = None
+
+
+class HeatmapFlagResponse(BaseModel):
+    """API response after saving a user flag."""
+
+    ok: bool
+    id: str | None = None
+    event: HeatmapEvent
+>>>>>>> origin/main
