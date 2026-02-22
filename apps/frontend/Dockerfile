@@ -20,7 +20,7 @@ RUN npm ci
 # Source is volume-mounted in docker-compose for hot-reload
 COPY . .
 
-EXPOSE 5173
+EXPOSE 5174
 
 # --host 0.0.0.0 required to be accessible outside the container
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

@@ -97,6 +97,36 @@ export default function App() {
         )}
       </main>
 
+      {/* ── Site footer (hidden on Analyze page) ── */}
+      {page !== 'analyze' && (
+        <footer
+          className="shrink-0 flex flex-wrap items-center justify-between gap-4 px-6 py-3"
+          style={{ borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(4,4,10,0.9)' }}
+        >
+          <span className="text-xs text-slate-700">© 2026 TruthGuard</span>
+          <nav className="flex items-center gap-1">
+            {[
+              { id: 'home',    label: 'Home' },
+              { id: 'analyze', label: 'Analyze' },
+              { id: 'heatmap', label: 'Heatmap' },
+              { id: 'reports', label: 'Reports' },
+            ].map(({ id, label }) => (
+              <button
+                key={id}
+                onClick={() => navigate(id)}
+                className="text-xs px-3 py-1 rounded-md transition-colors"
+                style={{
+                  color: page === id ? '#f87171' : '#475569',
+                  background: page === id ? 'rgba(239,68,68,0.08)' : 'transparent',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </nav>
+        </footer>
+      )}
+
       {/* Auth modal overlay */}
       {authModal && (
         <AuthModal

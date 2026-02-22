@@ -118,15 +118,17 @@ export default function Scam() {
   return (
     <div className="relative max-w-3xl mx-auto px-5 py-14">
 
-      {/* ── Background orbs ── */}
+      {/* ── Background shapes ── */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden>
-        <div className="orb orb-green"  style={{ width: 450, height: 450, top: '-8%',   left: '-12%',  opacity: 0.07 }} />
-        <div className="orb orb-violet" style={{ width: 350, height: 350, bottom: '5%', right: '-10%', opacity: 0.06 }} />
+        <div className="absolute rounded-full blur-3xl" style={{ width: 460, height: 460, top: '-10%', left: '-14%', background: 'radial-gradient(circle, rgba(239,68,68,0.2), transparent 70%)' }} />
+        <div className="absolute blur-3xl" style={{ width: 340, height: 220, bottom: '5%', right: '-8%', borderRadius: '40% 60% 60% 40% / 60% 40% 60% 40%', background: 'radial-gradient(circle, rgba(185,28,28,0.18), transparent 70%)' }} />
+        <div className="absolute blur-2xl" style={{ width: 300, height: 300, top: '40%', right: '10%', borderRadius: '60% 40% 30% 70% / 60% 30% 70% 40%', background: 'radial-gradient(circle, rgba(239,68,68,0.12), transparent 70%)' }} />
+        <div className="absolute rounded-full blur-3xl" style={{ width: 180, height: 180, top: '70%', left: '20%', background: 'radial-gradient(circle, rgba(220,38,38,0.14), transparent 70%)' }} />
       </div>
 
       {/* ── Page header ── */}
       <div className="mb-10">
-        <p className="text-xs text-emerald-500 uppercase tracking-[3px] font-semibold mb-3">
+        <p className="text-xs text-red-500 uppercase tracking-[3px] font-semibold mb-3">
           Phase 6 · Scam Detection
         </p>
         <h1 className="text-4xl font-extrabold text-white mb-2">Scam & Phishing Checker</h1>
@@ -151,7 +153,7 @@ export default function Scam() {
         />
         <div className="flex justify-between text-xs mt-1 mb-5">
           <span className="text-slate-600">Minimum 10 characters</span>
-          <span className={text.length < 10 ? 'text-slate-600' : 'text-emerald-500'}>
+          <span className={text.length < 10 ? 'text-slate-600' : 'text-red-400'}>
             {text.length.toLocaleString()} / 2000
           </span>
         </div>
@@ -299,11 +301,6 @@ export default function Scam() {
         </div>
       )}
 
-      {/* ── Disclaimer ── */}
-      <p className="text-center text-xs text-slate-700 mt-10 max-w-xl mx-auto leading-relaxed">
-        TruthGuard scam detection is <em>probabilistic</em>. Always exercise caution with unsolicited
-        messages and verify through official channels before responding.
-      </p>
     </div>
   )
 }

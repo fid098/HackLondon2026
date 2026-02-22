@@ -1,76 +1,78 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import Landing from '../Landing'
 
+// framer-motion hooks rely on browser scroll APIs not available in jsdom
+vi.mock('framer-motion', () => ({
+  motion: new Proxy({}, {
+    get: (_, tag) => {
+      const Component = ({ children, ...props }) => {
+        const {
+          style: _s, variants: _v, initial: _i, animate: _a,
+          whileInView: _w, whileHover: _wh, viewport: _vp,
+          transition: _t,
+          ...rest
+        } = props
+        return <tag {...rest}>{children}</tag>
+      }
+      Component.displayName = `motion.${tag}`
+      return Component
+    },
+  }),
+  useScroll: () => ({ scrollYProgress: { get: () => 0 } }),
+  useTransform: () => 0,
+}))
+
 function setup() {
-  const onNavigate = vi.fn()
-  render(<Landing onNavigate={onNavigate} />)
-  return { onNavigate }
+  render(<Landing />)
 }
 
 describe('Landing page', () => {
-  it('renders the main hero headline', () => {
+  it('renders the hero headline words', () => {
     setup()
-    expect(screen.getByText('Detect')).toBeInTheDocument()
-    expect(screen.getByText('Misinformation')).toBeInTheDocument()
+    expect(screen.getByText('REALITY')).toBeInTheDocument()
+    expect(screen.getByText('CAN BE')).toBeInTheDocument()
+    expect(screen.getByText('FABRICATED.')).toBeInTheDocument()
   })
 
-  it('renders the HackLondon badge', () => {
+  it('renders the TruthGuard / HackLondon badge', () => {
     setup()
     expect(screen.getByText(/HackLondon 2026/)).toBeInTheDocument()
   })
 
-  it('renders the Start Analysing CTA', () => {
+  it('renders the Launch Verification CTA button', () => {
     setup()
-    expect(screen.getByText(/Start Analysing/i)).toBeInTheDocument()
+    expect(screen.getByText(/Launch Verification/i)).toBeInTheDocument()
   })
 
-  it('renders the View Live Heatmap CTA', () => {
+  it('renders the View Global Heatmap CTA button', () => {
     setup()
-    expect(screen.getByText(/View Live Heatmap/i)).toBeInTheDocument()
+    expect(screen.getByText(/View Global Heatmap/i)).toBeInTheDocument()
   })
 
-  it('navigates to analyze when primary CTA is clicked', () => {
-    const { onNavigate } = setup()
-    fireEvent.click(screen.getByText(/Start Analysing/i))
-    expect(onNavigate).toHaveBeenCalledWith('analyze')
-  })
-
-  it('navigates to heatmap when secondary CTA is clicked', () => {
-    const { onNavigate } = setup()
-    fireEvent.click(screen.getByText(/View Live Heatmap/i))
-    expect(onNavigate).toHaveBeenCalledWith('heatmap')
-  })
-
-  it('renders 3 feature cards', () => {
+  it('renders the problem section heading', () => {
     setup()
-    expect(screen.getByText('AI Analysis Suite')).toBeInTheDocument()
-    expect(screen.getByText('Live Heatmap')).toBeInTheDocument()
-    expect(screen.getByText('Report Archive')).toBeInTheDocument()
+    expect(screen.getByText(/The Next Infrastructure Threat/i)).toBeInTheDocument()
   })
 
-  it('navigates to analyze when AI Analysis Suite card is clicked', () => {
-    const { onNavigate } = setup()
-    const card = screen.getByText('AI Analysis Suite').closest('div[class*="rounded"]')
-    if (card) fireEvent.click(card)
-    expect(onNavigate).toHaveBeenCalledWith('analyze')
-  })
-
-  it('renders the pipeline section heading', () => {
+  it('renders the SDG / impact section heading', () => {
     setup()
-    expect(screen.getByText('The AI Debate Pipeline')).toBeInTheDocument()
+    expect(screen.getByText(/Protecting People & Cities/i)).toBeInTheDocument()
   })
 
-  it('renders all 4 pipeline steps', () => {
+  it('renders impact goal cards', () => {
     setup()
-    expect(screen.getByText('Submit')).toBeInTheDocument()
-    expect(screen.getByText('Extract')).toBeInTheDocument()
-    expect(screen.getByText('Debate')).toBeInTheDocument()
-    expect(screen.getByText('Verdict')).toBeInTheDocument()
+    expect(screen.getByText(/Goal 3: Health & Wellbeing/i)).toBeInTheDocument()
+    expect(screen.getByText(/Goal 16: Justice & Government/i)).toBeInTheDocument()
   })
 
-  it('renders the disclaimer text', () => {
+  it('renders the local governance section heading', () => {
     setup()
-    expect(screen.getByText(/probabilistic assessments only/i)).toBeInTheDocument()
+    expect(screen.getByText(/Physical Trust & Local Governance/i)).toBeInTheDocument()
+  })
+
+  it('renders the footer copyright', () => {
+    setup()
+    expect(screen.getByText(/2026 TruthGuard Protocol/i)).toBeInTheDocument()
   })
 })

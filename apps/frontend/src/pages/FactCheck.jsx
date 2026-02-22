@@ -75,12 +75,12 @@ function Tab({ id, label, icon, active, onClick }) {
       className={[
         'flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 focus:outline-none',
         active
-          ? 'text-emerald-400'
+          ? 'text-red-400'
           : 'text-slate-500 hover:text-slate-300',
       ].join(' ')}
       style={
         active
-          ? { background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)' }
+          ? { background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)' }
           : { background: 'transparent', border: '1px solid transparent' }
       }
     >
@@ -191,15 +191,17 @@ export default function FactCheck() {
   return (
     <div className="relative max-w-4xl mx-auto px-5 py-14">
 
-      {/* ── Background orbs ── */}
+      {/* ── Background shapes ── */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden>
-        <div className="orb orb-green"  style={{ width: 500, height: 500, top: '-10%',  left: '-10%',  opacity: 0.09 }} />
-        <div className="orb orb-violet" style={{ width: 400, height: 400, bottom: '5%', right: '-15%', opacity: 0.07 }} />
+        <div className="absolute blur-3xl" style={{ width: 480, height: 320, top: '-8%', left: '-15%', borderRadius: '50% 50% 60% 40% / 40% 60% 40% 60%', background: 'radial-gradient(circle, rgba(239,68,68,0.2), transparent 70%)' }} />
+        <div className="absolute rounded-full blur-3xl" style={{ width: 400, height: 400, bottom: '5%', right: '-12%', background: 'radial-gradient(circle, rgba(185,28,28,0.18), transparent 70%)' }} />
+        <div className="absolute blur-2xl" style={{ width: 260, height: 380, top: '30%', right: '15%', borderRadius: '30% 70% 70% 30% / 30% 30% 70% 70%', background: 'radial-gradient(circle, rgba(239,68,68,0.1), transparent 70%)' }} />
+        <div className="absolute rounded-full blur-3xl" style={{ width: 240, height: 240, top: '65%', left: '10%', background: 'radial-gradient(circle, rgba(220,38,38,0.13), transparent 70%)' }} />
       </div>
 
       {/* ── Page header ── */}
       <div className="mb-10">
-        <p className="text-xs text-emerald-500 uppercase tracking-[3px] font-semibold mb-3">
+        <p className="text-xs text-red-500 uppercase tracking-[3px] font-semibold mb-3">
           AI Fact-Check
         </p>
         <h1 className="text-4xl font-extrabold text-white mb-2">Analyse a Claim</h1>
@@ -235,7 +237,8 @@ export default function FactCheck() {
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="https://example.com/article  or  https://youtu.be/..."
-                className="input-field w-full pl-12"
+                className="input-field w-full"
+                style={{ paddingLeft: '3rem' }}
               />
             </div>
 
@@ -269,7 +272,7 @@ export default function FactCheck() {
             />
             <div className="flex justify-between text-xs">
               <span className="text-slate-600">Minimum 20 characters</span>
-              <span className={text.length < 20 ? 'text-slate-600' : 'text-emerald-500'}>
+              <span className={text.length < 20 ? 'text-slate-600' : 'text-red-400'}>
                 {text.length.toLocaleString()} chars
               </span>
             </div>
@@ -287,8 +290,8 @@ export default function FactCheck() {
               onClick={() => fileRef.current?.click()}
               className="rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-3 py-12 cursor-pointer transition-all duration-200"
               style={{
-                borderColor: dragOver ? 'rgba(16,185,129,0.6)' : 'rgba(255,255,255,0.1)',
-                background:  dragOver ? 'rgba(16,185,129,0.05)' : 'rgba(255,255,255,0.01)',
+                borderColor: dragOver ? 'rgba(239,68,68,0.6)' : 'rgba(255,255,255,0.1)',
+                background:  dragOver ? 'rgba(239,68,68,0.05)' : 'rgba(255,255,255,0.01)',
               }}
             >
               <span className="text-4xl select-none">{mediaFile ? '✅' : '📂'}</span>
@@ -446,7 +449,7 @@ export default function FactCheck() {
                   href={s.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-3 text-sm text-slate-400 hover:text-emerald-400 transition-colors"
+                  className="flex items-center gap-3 text-sm text-slate-400 hover:text-red-400 transition-colors"
                 >
                   <span className="text-slate-700 font-mono text-xs shrink-0">[{i + 1}]</span>
                   {s.title}
@@ -474,11 +477,6 @@ export default function FactCheck() {
         </div>
       )}
 
-      {/* ── Disclaimer ── */}
-      <p className="text-center text-xs text-slate-700 mt-10 max-w-xl mx-auto leading-relaxed">
-        TruthGuard provides <em>probabilistic assessments only</em>. Results should not be the sole
-        basis for any decision. Always verify with primary sources.
-      </p>
     </div>
   )
 }
