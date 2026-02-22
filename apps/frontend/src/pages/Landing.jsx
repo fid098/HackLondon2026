@@ -35,6 +35,7 @@
 
 import { motion, useScroll, useTransform } from 'framer-motion'
 import { useRef } from 'react'
+import DarkVeil from '../components/DarkVeil'
 
 export default function Landing({ onNavigate }) {
   const containerRef = useRef(null)
@@ -50,13 +51,30 @@ export default function Landing({ onNavigate }) {
   const y4 = useTransform(scrollYProgress, [0, 1], [0, 150])
   const y5 = useTransform(scrollYProgress, [0, 1], [0, -200])
   const y6 = useTransform(scrollYProgress, [0, 1], [0, 250])
+  /* Teal parallax orbs */
+  const y7 = useTransform(scrollYProgress, [0, 1], [0, -140])
+  const y8 = useTransform(scrollYProgress, [0, 1], [0, 190])
   const shapeOpacity = useTransform(scrollYProgress, [0.7, 1], [1, 0])
 
   return (
-    <div ref={containerRef} className="relative text-white" style={{ background: 'var(--bg-base)' }}>
+    <div ref={containerRef} className="relative text-white">
+
+      {/* ── DarkVeil WebGL background — fixed, full-viewport, behind all layers ── */}
+      <div className="fixed inset-0 pointer-events-none" style={{ zIndex: -1 }}>
+        <DarkVeil
+          hueShift={-120}
+          noiseIntensity={0}
+          scanlineIntensity={1}
+          speed={1}
+          scanlineFrequency={0}
+          warpAmount={1}
+          resolutionScale={1.75}
+        />
+      </div>
 
       {/* ── Floating shapes layer ── */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        {/* Red orbs */}
         <motion.div style={{ y: y1, opacity: shapeOpacity }}
           className="absolute top-10 left-[-8rem] w-96 h-96 rounded-full bg-red-700/20 blur-2xl" />
         <motion.div style={{ y: y2, opacity: shapeOpacity }}
@@ -69,6 +87,11 @@ export default function Landing({ onNavigate }) {
           className="absolute top-[10vh] right-1/3 w-80 h-80 rounded-full bg-red-700/15 blur-2xl" />
         <motion.div style={{ y: y6, opacity: shapeOpacity }}
           className="absolute bottom-[10vh] right-1/3 w-72 h-72 rounded-full bg-red-800/20 blur-2xl" />
+        {/* Teal orbs — contrasting cool tone */}
+        <motion.div style={{ y: y7, opacity: shapeOpacity, background: 'rgba(20,184,166,0.13)' }}
+          className="absolute top-[18vh] left-[62%] w-72 h-72 rounded-full blur-3xl" />
+        <motion.div style={{ y: y8, opacity: shapeOpacity, background: 'rgba(20,184,166,0.09)' }}
+          className="absolute bottom-[18vh] right-[18%] w-80 h-80 rounded-full blur-2xl" />
       </div>
 
       {/* ── Main content ── */}
@@ -77,12 +100,26 @@ export default function Landing({ onNavigate }) {
         {/* ══════════════════ HERO ══════════════════ */}
         <section className="pt-24 pb-16 md:pt-32 md:pb-20 flex flex-col justify-center px-6 md:px-16">
           <div className="max-w-6xl mx-auto w-full">
+            {/* ── Liquid glass badge pills ── */}
+            <div className="flex flex-wrap gap-3 mb-8">
+              <span className="liquid-pill liquid-pill-red">⬤ Active Detection</span>
+              <span className="liquid-pill liquid-pill-teal">🛡 Civic Grade · HackLondon 2026</span>
+            </div>
+
             <h1 className="leading-none font-extrabold">
               <span className="block text-white text-4xl md:text-6xl lg:text-7xl">REALITY</span>
               <span className="block text-red-600  text-4xl md:text-6xl lg:text-7xl">CAN BE</span>
               <span className="block text-red-700  text-4xl md:text-6xl lg:text-7xl">FABRICATED.</span>
             </h1>
-            <p className="mt-8 max-w-2xl text-gray-400 text-base md:text-lg">
+
+            {/* Subtle teal/red gradient accent line below headline */}
+            <div className="mt-5 mb-5" style={{
+              height: 1,
+              width: '40%',
+              background: 'linear-gradient(90deg, rgba(239,68,68,0.5), rgba(20,184,166,0.5), transparent)',
+            }} />
+
+            <p className="max-w-2xl text-gray-400 text-base md:text-lg">
               Deepfake officials. Forged planning notices. Synthetic infrastructure
               failures. In smart cities, misinformation becomes physical risk.
             </p>
@@ -99,6 +136,23 @@ export default function Landing({ onNavigate }) {
               >
                 View Global Heatmap
               </button>
+            </div>
+
+            {/* ── Trust stats strip ── */}
+            <div className="mt-10 flex flex-wrap gap-3">
+              {[
+                { icon: '🔍', label: '3 AI Models', variant: 'red'  },
+                { icon: '⚡', label: 'Real-Time Detection', variant: 'teal' },
+                { icon: '🌐', label: 'Civic & Media Grade', variant: 'teal' },
+                { icon: '🔒', label: 'Source Verified', variant: 'red'  },
+              ].map(({ icon, label, variant }) => (
+                <div key={label}
+                  className={`liquid-pill ${variant === 'teal' ? 'liquid-pill-teal' : 'liquid-pill-red'}`}
+                  style={{ fontSize: 11, padding: '6px 14px' }}>
+                  <span>{icon}</span>
+                  <span>{label}</span>
+                </div>
+              ))}
             </div>
           </div>
         </section>
@@ -121,12 +175,12 @@ export default function Landing({ onNavigate }) {
               </ul>
             </div>
             <motion.div
-              whileHover={{ scale: 1.05 }}
-              className="p-6 rounded-xl border"
-              style={{ background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.1)' }}
+              whileHover={{ scale: 1.03 }}
+              className="p-6 glass-red"
             >
+              <div className="w-2 h-2 rounded-full bg-red-400 mb-3" />
               <h3 className="text-red-400 font-semibold text-lg mb-2">Shadow Planning</h3>
-              <p className="text-gray-300">
+              <p className="text-gray-300 text-sm">
                 Fake digital notices can manipulate property prices, creating chaos in local governance.
               </p>
             </motion.div>
@@ -140,18 +194,22 @@ export default function Landing({ onNavigate }) {
             <ImpactCard
               goal="Goal 3: Health &amp; Wellbeing"
               description="Fake medical scans &amp; insurance claims are flagged to reduce misinformation."
+              variant="red"
             />
             <ImpactCard
               goal="Goal 4: Quality Education"
               description="AI-generated certificates verified to prevent fraud."
+              variant="teal"
             />
             <ImpactCard
               goal="Goal 8: Work &amp; Economic Growth"
               description="False claims evidence is validated to protect employers &amp; insurers."
+              variant="teal"
             />
             <ImpactCard
               goal="Goal 16: Justice &amp; Government"
               description="Falsified statistics and climate denial misinformation are identified to protect democracy."
+              variant="red"
             />
           </div>
         </Section>
@@ -175,12 +233,12 @@ export default function Landing({ onNavigate }) {
               </ul>
             </div>
             <motion.div
-              whileHover={{ scale: 1.05 }}
-              className="p-6 rounded-xl border"
-              style={{ background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.1)' }}
+              whileHover={{ scale: 1.03 }}
+              className="p-6 glass-teal"
             >
-              <h3 className="text-red-400 font-semibold text-lg mb-2">Future-Proof Civic Trust</h3>
-              <p className="text-gray-300">
+              <div className="w-2 h-2 rounded-full mb-3" style={{ background: '#5eead4' }} />
+              <h3 className="font-semibold text-lg mb-2" style={{ color: '#5eead4' }}>Future-Proof Civic Trust</h3>
+              <p className="text-gray-300 text-sm">
                 Interactive verification ensures all citizens can trust critical information,
                 even in smart cities.
               </p>
@@ -212,15 +270,29 @@ function Section({ children }) {
 }
 
 /* ─── SDG impact card ────────────────────────────────────────────────────── */
-function ImpactCard({ goal, description }) {
+function ImpactCard({ goal, description, variant = 'red' }) {
+  const isTeal = variant === 'teal'
+  const accentColor  = isTeal ? '#5eead4'               : '#f87171'
+  const bgColor      = isTeal ? 'rgba(20,184,166,0.06)' : 'rgba(239,68,68,0.06)'
+  const borderColor  = isTeal ? 'rgba(20,184,166,0.2)'  : 'rgba(239,68,68,0.2)'
+  const shadowColor  = isTeal ? 'rgba(20,184,166,0.08)' : 'rgba(239,68,68,0.08)'
+
   return (
     <motion.div
-      whileHover={{ scale: 1.05 }}
-      className="p-6 rounded-xl border transition-transform"
-      style={{ background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.1)' }}
+      whileHover={{ scale: 1.03, y: -4 }}
+      className="p-6 rounded-xl"
+      style={{
+        background:          bgColor,
+        border:              `1px solid ${borderColor}`,
+        backdropFilter:      'blur(16px)',
+        WebkitBackdropFilter:'blur(16px)',
+        boxShadow:           `0 4px 20px ${shadowColor}, inset 0 1px 0 rgba(255,255,255,0.04)`,
+        transition:          'all 0.25s',
+      }}
     >
-      <h3 className="text-red-400 font-semibold text-lg mb-2">{goal}</h3>
-      <p className="text-gray-300 text-base">{description}</p>
+      <div className="w-2 h-2 rounded-full mb-3" style={{ background: accentColor }} />
+      <h3 className="font-semibold text-sm mb-2" style={{ color: accentColor }}>{goal}</h3>
+      <p className="text-gray-300 text-sm">{description}</p>
     </motion.div>
   )
 }

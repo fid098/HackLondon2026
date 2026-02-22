@@ -7,6 +7,8 @@
   --bg-base:    #04040a;
   --accent:     #ef4444;
   --accent-dim: rgba(239, 68, 68, 0.12);
+  --teal:       #14b8a6;
+  --teal-dim:   rgba(20, 184, 166, 0.12);
   --border:     rgba(255, 255, 255, 0.07);
   --border-h:   rgba(255, 255, 255, 0.13);
 }
@@ -67,6 +69,65 @@
   transform:    translateY(-2px);
 }
 
+/* ─── Coloured liquid glass cards ────────────────────────────────────────── */
+.glass-red {
+  background:          rgba(239, 68, 68, 0.06);
+  border:              1px solid rgba(239, 68, 68, 0.2);
+  backdrop-filter:     blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow:          0 4px 24px rgba(239, 68, 68, 0.07), inset 0 1px 0 rgba(255,255,255,0.05);
+  border-radius:       14px;
+  transition:          background 0.25s, border-color 0.25s, transform 0.25s, box-shadow 0.25s;
+}
+.glass-red:hover {
+  background:    rgba(239, 68, 68, 0.1);
+  border-color:  rgba(239, 68, 68, 0.32);
+  transform:     translateY(-3px);
+  box-shadow:    0 8px 32px rgba(239, 68, 68, 0.12), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+.glass-teal {
+  background:          rgba(20, 184, 166, 0.06);
+  border:              1px solid rgba(20, 184, 166, 0.2);
+  backdrop-filter:     blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow:          0 4px 24px rgba(20, 184, 166, 0.07), inset 0 1px 0 rgba(255,255,255,0.05);
+  border-radius:       14px;
+  transition:          background 0.25s, border-color 0.25s, transform 0.25s, box-shadow 0.25s;
+}
+.glass-teal:hover {
+  background:    rgba(20, 184, 166, 0.1);
+  border-color:  rgba(20, 184, 166, 0.32);
+  transform:     translateY(-3px);
+  box-shadow:    0 8px 32px rgba(20, 184, 166, 0.12), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+/* ─── Liquid glass pills ─────────────────────────────────────────────────── */
+.liquid-pill {
+  display:             inline-flex;
+  align-items:         center;
+  gap:                 5px;
+  padding:             4px 12px;
+  border-radius:       999px;
+  font-size:           10px;
+  font-weight:         600;
+  letter-spacing:      0.07em;
+  text-transform:      uppercase;
+  backdrop-filter:     blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.liquid-pill-red {
+  background:  rgba(239, 68, 68, 0.1);
+  border:      1px solid rgba(239, 68, 68, 0.25);
+  color:       #f87171;
+  box-shadow:  0 2px 12px rgba(239, 68, 68, 0.1);
+}
+.liquid-pill-teal {
+  background:  rgba(20, 184, 166, 0.1);
+  border:      1px solid rgba(20, 184, 166, 0.25);
+  color:       #5eead4;
+  box-shadow:  0 2px 12px rgba(20, 184, 166, 0.1);
+}
+
 /* ─── Gradient text ──────────────────────────────────────────────────────── */
 .gradient-text {
   background: linear-gradient(135deg, #ef4444 0%, #f87171 45%, #fca5a5 100%);
@@ -86,6 +147,12 @@
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+.gradient-text-teal {
+  background: linear-gradient(135deg, #14b8a6 0%, #5eead4 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
 
 /* ─── Animated background orbs ──────────────────────────────────────────── */
 .orb {
@@ -100,6 +167,7 @@
 .orb-red    { background: radial-gradient(circle, rgba(239,68,68,0.35), transparent 70%); animation-delay: -2s; }
 .orb-blue   { background: radial-gradient(circle, rgba(59,130,246,0.25), transparent 70%); animation-delay: -7s; }
 .orb-amber  { background: radial-gradient(circle, rgba(245,158,11,0.2), transparent 70%); animation-delay: -2s; }
+.orb-teal   { background: radial-gradient(circle, rgba(20,184,166,0.3), transparent 70%); animation-delay: -5s; }
 
 @keyframes orbDrift {
   0%, 100% { transform: translateY(0) translateX(0) scale(1); }

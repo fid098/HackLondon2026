@@ -72,7 +72,7 @@ export default function App() {
   const PageComponent = PAGES[page] || Landing
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
+    <div className="min-h-screen flex flex-col">
       <Navbar
         currentPage={page}
         onNavigate={navigate}

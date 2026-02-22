@@ -294,15 +294,21 @@ export default function Reports({ onNavigate }) {
 
       {/* ── background shapes ── */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden>
+        {/* Red orbs */}
         <div className="absolute rounded-full blur-3xl" style={{ width: 480, height: 480, top: '-10%', right: '-10%', background: 'radial-gradient(circle, rgba(239,68,68,0.18), transparent 70%)' }} />
         <div className="absolute blur-3xl" style={{ width: 380, height: 380, bottom: '0', left: '-10%', borderRadius: '50%', background: 'radial-gradient(circle, rgba(185,28,28,0.14), transparent 70%)' }} />
+        {/* Teal orb — cool contrast */}
+        <div className="absolute rounded-full blur-3xl" style={{ width: 360, height: 360, top: '28%', left: '32%', background: 'radial-gradient(circle, rgba(20,184,166,0.09), transparent 70%)' }} />
       </div>
 
       {/* ── header ── */}
       <div className="mb-10">
-        <p className="text-xs text-red-500 uppercase tracking-[3px] font-semibold mb-3">
-          Persistent
-        </p>
+        <div className="flex flex-wrap items-center gap-3 mb-3">
+          <p className="text-xs text-red-500 uppercase tracking-[3px] font-semibold">
+            Persistent
+          </p>
+          <span className="liquid-pill liquid-pill-teal">⬤ Atlas Sync</span>
+        </div>
         <h1 className="text-4xl font-extrabold text-white mb-2">Report Archive</h1>
         <p className="text-slate-500">
           Every analysis is saved to MongoDB Atlas. Search, filter, and re-open any previous report.
@@ -313,10 +319,16 @@ export default function Reports({ onNavigate }) {
       <div className="flex flex-wrap gap-3 mb-8">
         <div
           className="flex items-center gap-2 px-4 py-2 rounded-xl"
-          style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+          style={{
+            background:          'rgba(239,68,68,0.07)',
+            border:              '1px solid rgba(239,68,68,0.18)',
+            backdropFilter:      'blur(12px)',
+            WebkitBackdropFilter:'blur(12px)',
+            boxShadow:           'inset 0 1px 0 rgba(255,255,255,0.04)',
+          }}
         >
           <span className="text-xl font-black text-white">{total}</span>
-          <span className="text-xs text-slate-600">total reports</span>
+          <span className="text-xs" style={{ color: '#f87171', opacity: 0.8 }}>total reports</span>
         </div>
         {Object.entries(stats).map(([verdict, count]) => {
           const vs = V[verdict]
@@ -438,7 +450,13 @@ export default function Reports({ onNavigate }) {
       {/* ── New report CTA ── */}
       <div
         className="mt-12 rounded-2xl p-7 flex flex-col md:flex-row items-center justify-between gap-5"
-        style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.18)' }}
+        style={{
+          background:          'linear-gradient(135deg, rgba(239,68,68,0.07) 0%, rgba(20,184,166,0.06) 100%)',
+          border:              '1px solid rgba(255,255,255,0.09)',
+          backdropFilter:      'blur(16px)',
+          WebkitBackdropFilter:'blur(16px)',
+          boxShadow:           'inset 0 1px 0 rgba(255,255,255,0.05)',
+        }}
       >
         <div>
           <h3 className="text-white font-bold mb-1">Ready to fact-check something new?</h3>

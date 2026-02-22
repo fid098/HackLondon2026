@@ -842,17 +842,24 @@ export default function Analyze() {
 
       {/* ── Background shapes ── */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden>
+        {/* Red orbs */}
         <div className="absolute rounded-full blur-3xl" style={{ width: 520, height: 520, top: '-12%', left: '-12%', background: 'radial-gradient(circle, rgba(239,68,68,0.22), transparent 70%)' }} />
         <div className="absolute blur-3xl" style={{ width: 420, height: 280, top: '35%', right: '-8%', borderRadius: '60% 40% 40% 60% / 50% 60% 40% 50%', background: 'radial-gradient(circle, rgba(185,28,28,0.18), transparent 70%)' }} />
         <div className="absolute rounded-full blur-2xl" style={{ width: 280, height: 280, bottom: '8%', left: '25%', background: 'radial-gradient(circle, rgba(239,68,68,0.14), transparent 70%)' }} />
         <div className="absolute blur-3xl" style={{ width: 320, height: 200, top: '60%', left: '-5%', borderRadius: '40% 60%', background: 'radial-gradient(circle, rgba(220,38,38,0.12), transparent 70%)' }} />
+        {/* Teal orbs — cool contrast */}
+        <div className="absolute rounded-full blur-3xl" style={{ width: 400, height: 400, top: '10%', right: '-6%', background: 'radial-gradient(circle, rgba(20,184,166,0.11), transparent 70%)' }} />
+        <div className="absolute blur-3xl" style={{ width: 260, height: 200, bottom: '22%', right: '28%', borderRadius: '50%', background: 'radial-gradient(circle, rgba(20,184,166,0.08), transparent 70%)' }} />
       </div>
 
       {/* ── Page header ── */}
       <div className="mb-10">
-        <p className="text-xs text-red-500 uppercase tracking-[3px] font-semibold mb-3">
-          AI Analysis Suite
-        </p>
+        <div className="flex flex-wrap items-center gap-3 mb-3">
+          <p className="text-xs text-red-500 uppercase tracking-[3px] font-semibold">
+            AI Analysis Suite
+          </p>
+          <span className="liquid-pill liquid-pill-teal">Multi-Model · Real-Time</span>
+        </div>
         <h1 className="text-4xl font-extrabold text-white mb-2">Analyze Content</h1>
         <p className="text-slate-500 max-w-2xl">
           Submit a URL, text, or media file. We simultaneously run{' '}
@@ -864,7 +871,13 @@ export default function Analyze() {
 
       {/* ── Input card ── */}
       <div className="rounded-2xl p-8 mb-8"
-        style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
+        style={{
+          background:          'rgba(255,255,255,0.025)',
+          border:              '1px solid rgba(255,255,255,0.08)',
+          backdropFilter:      'blur(20px)',
+          WebkitBackdropFilter:'blur(20px)',
+          boxShadow:           '0 0 80px rgba(239,68,68,0.05), 0 0 80px rgba(20,184,166,0.04), inset 0 1px 0 rgba(255,255,255,0.05)',
+        }}>
 
         {/* Tab strip */}
         <div className="flex flex-wrap gap-2 mb-7">
@@ -974,7 +987,16 @@ export default function Analyze() {
 
           {/* Pipeline step indicator — text / URL fact-check only */}
           {loading && tab !== 'media' && (
-            <div className="flex flex-col gap-1.5 pl-1">
+            <div className="flex flex-col gap-1.5 p-4 rounded-xl"
+              style={{
+                background:          'rgba(20,184,166,0.04)',
+                border:              '1px solid rgba(20,184,166,0.14)',
+                backdropFilter:      'blur(10px)',
+                WebkitBackdropFilter:'blur(10px)',
+              }}>
+              <p className="text-xs font-semibold mb-1" style={{ color: '#5eead4', letterSpacing: '0.07em', textTransform: 'uppercase', fontSize: 9 }}>
+                Pipeline Running
+              </p>
               {(isYT ? YT_PIPELINE_STEPS : PIPELINE_STEPS).map((step, i) => {
                 const done    = i < pipelineStep
                 const active  = i === pipelineStep
