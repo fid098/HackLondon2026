@@ -1,57 +1,4 @@
-/**
- * Popup.tsx — Chrome Extension Popup — Phase 4.
- *
- * DEVELOPER: Fidel
- * ─────────────────────────────────────────────────────────────────────────────
- * This is the 320px React component that appears when a user clicks the
- * TruthGuard shield icon in Chrome's toolbar.
- *
- * FEATURES
- * ─────────
- * - API connectivity status badge (checks GET /health on mount)
- * - On/Off toggle (persisted via chrome.storage.sync through the background worker)
- * - Sensitivity selector: Low / Medium / High (also persisted)
- * - "Analyse this page" button (calls POST /api/v1/triage with the current tab URL)
- * - Result card showing verdict + confidence + summary from triage
- * - Link to the TruthGuard web app
- *
- * WHY INLINE STYLES (no Tailwind)?
- * ──────────────────────────────────
- * Tailwind CSS is compiled for the main web app (apps/frontend). The popup
- * runs in its own isolated HTML page (popup/index.html) and is bundled
- * separately. Adding Tailwind to the popup would increase bundle size
- * significantly — inline styles keep the popup bundle under 20 KB.
- * The colour constants in `C` replace CSS variables.
- *
- * COMMUNICATION PATTERNS USED HERE
- * ──────────────────────────────────
- * 1. Direct fetch for health check and "Analyse this page":
- *    The popup CAN make direct fetch() calls to the API because it runs
- *    in its own extension context (not the page's security context).
- *    Content scripts CANNOT do this — they must go through the background worker.
- *
- * 2. chrome.runtime.sendMessage() for settings:
- *    Settings are persisted via chrome.storage.sync (synced across devices).
- *    The background worker owns storage — the popup delegates to it.
- *    GET_SETTINGS → returns { ok: true, data: Settings }
- *    SET_SETTINGS → saves partial settings update, returns { ok: true }
- *
- * 3. chrome.tabs.query() to get the current tab URL:
- *    { active: true, currentWindow: true } always returns the foreground tab.
- *    We guard against chrome:// URLs because those cannot be analysed.
- *
- * WHAT TO IMPROVE (your tasks as Fidel)
- * ────────────────────────────────────────
- * - Add a "History" tab showing the last 10 analyses (from chrome.storage.local).
- * - Show the badge count (number of flagged posts on the current page).
- * - Add a loading skeleton while the health check runs instead of "Connecting…".
- * - Make the web app link dynamic — use the apiBase setting so it points to
- *   the correct web app URL (currently hardcoded to localhost:5173).
- *
- * See docs/developers/FIDEL.md for full task list and extension architecture.
- */
-
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 type ConnectionStatus = 'checking' | 'connected' | 'disconnected'
 type Sensitivity = 'low' | 'medium' | 'high'
@@ -60,167 +7,549 @@ interface Settings {
   enabled: boolean
   sensitivity: Sensitivity
   apiBase: string
+  redFlagEnabled: boolean
+  meetingModeEnabled: boolean
+}
+
+interface TriageHighlight {
+  text: string
+  label: string
 }
 
 interface TriageResult {
   verdict: string
   confidence: number
   summary: string
+  highlights?: TriageHighlight[]
 }
 
-// Default settings used before chrome.storage.sync has been loaded.
-// Also used as the fallback if storage returns nothing (fresh install).
+interface RuntimeResponse<T> {
+  ok: boolean
+  data?: T
+  error?: string
+}
+
+interface VideoFlagResult {
+  ok: boolean
+  id: string | null
+  event?: {
+    label: string
+    category: string
+    severity: string
+  }
+}
+
+interface MeetingModeStatus {
+  enabled: boolean
+  meetingHost: boolean
+  activeVideos: number
+  sampledFrames: number
+  latestRiskScore: number | null
+  latestLabel: 'REAL' | 'SUSPECTED_FAKE' | 'UNVERIFIED'
+  latestReason: string
+  updatedAt: number
+}
+
 const DEFAULT_SETTINGS: Settings = {
   enabled: true,
   sensitivity: 'medium',
-  apiBase: 'http://localhost:8000',  // change to production URL for deployment
+  apiBase: 'http://localhost:8000',
+  redFlagEnabled: true,
+  meetingModeEnabled: false,
 }
 
-// ── Colour constants (replaces Tailwind/CSS variables in popup context) ────────
-
 const C = {
-  bg:       '#0f172a',           // page background
-  surface:  'rgba(255,255,255,0.04)',
-  border:   'rgba(255,255,255,0.08)',
-  text:     '#f1f5f9',           // primary text
-  muted:    '#64748b',           // secondary text
-  accent:   '#34d399',           // emerald green — used for "ON" state and brand
-  violet:   '#818cf8',           // indigo — used for "Analyse" button
-  red:      '#ef4444',           // red — used for "OFF" state and errors
-  amber:    '#f59e0b',           // amber — unused currently, available for warnings
+  bg: '#0f172a',
+  surface: 'rgba(255,255,255,0.04)',
+  border: 'rgba(255,255,255,0.08)',
+  text: '#f1f5f9',
+  muted: '#64748b',
+  accent: '#34d399',
+  violet: '#818cf8',
+  red: '#ef4444',
+  amber: '#f59e0b',
 } as const
 
-// Maps verdict strings from the API to highlight colours in the result card
 const VERDICT_COLORS: Record<string, string> = {
-  TRUE:       '#10b981',
-  FALSE:      '#ef4444',
+  TRUE: '#10b981',
+  FALSE: '#ef4444',
   MISLEADING: '#f59e0b',
+  AI_GENERATED: '#f97316',
   UNVERIFIED: '#6366f1',
-  SATIRE:     '#8b5cf6',
+  SATIRE: '#8b5cf6',
+}
+
+const SCAN_STEPS = [
+  { at: 0, label: 'Fetching page metadata...' },
+  { at: 22, label: 'Cross-referencing sources...' },
+  { at: 50, label: 'Running AI analysis...' },
+  { at: 75, label: 'Verifying results...' },
+  { at: 90, label: 'Compiling verdict...' },
+]
+
+function sendRuntimeMessage<T>(message: { type: string; payload?: unknown }): Promise<RuntimeResponse<T>> {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(message, (res: RuntimeResponse<T>) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message))
+        return
+      }
+      resolve(res)
+    })
+  })
+}
+
+function sendTabMessage<T>(tabId: number, message: { type: string; payload?: unknown }): Promise<RuntimeResponse<T>> {
+  return new Promise((resolve) => {
+    chrome.tabs.sendMessage(tabId, message, (res: RuntimeResponse<T>) => {
+      if (chrome.runtime.lastError) {
+        resolve({ ok: false, error: chrome.runtime.lastError.message })
+        return
+      }
+      resolve(res ?? { ok: false, error: 'No response from page.' })
+    })
+  })
+}
+
+function withNoTrailingSlash(input: string): string {
+  return input.trim().replace(/\/+$/, '')
+}
+
+async function getActiveTab(): Promise<chrome.tabs.Tab | null> {
+  return new Promise((resolve) => {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      resolve(tabs[0] ?? null)
+    })
+  })
+}
+
+async function getCurrentLocation(): Promise<{ lat: number; lng: number } | null> {
+  return new Promise((resolve) => {
+    if (!('geolocation' in navigator)) {
+      resolve(null)
+      return
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        resolve({
+          lat: Number(position.coords.latitude),
+          lng: Number(position.coords.longitude),
+        })
+      },
+      () => resolve(null),
+      { enableHighAccuracy: false, timeout: 7000, maximumAge: 120000 },
+    )
+  })
+}
+
+async function checkApiHealth(apiBase: string): Promise<{ connected: boolean; database: string }> {
+  const base = withNoTrailingSlash(apiBase)
+  const candidates = [`${base}/health`, `${base}/api/health`]
+
+  for (const url of candidates) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(5000) })
+      if (!res.ok) continue
+      const data = (await res.json()) as { status?: string; database?: string }
+      if (data.status === 'ok') {
+        return { connected: true, database: data.database ?? 'unknown' }
+      }
+    } catch {
+      // Try the next candidate.
+    }
+  }
+
+  return { connected: false, database: '' }
+}
+
+function detectPlatform(url: string): string {
+  try {
+    const host = new URL(url).hostname.toLowerCase()
+    if (host.includes('meet.google.com')) return 'google_meet'
+    if (host.includes('zoom.us')) return 'zoom'
+    if (host === 'localhost' || host === '127.0.0.1') return 'google_meet'
+    if (host.includes('youtube')) return 'youtube'
+    if (host.includes('tiktok')) return 'tiktok'
+    if (host.includes('instagram')) return 'instagram'
+    if (host.includes('twitter') || host.includes('x.com')) return 'x'
+    if (host.includes('telegram')) return 'telegram'
+    if (host.includes('facebook')) return 'facebook'
+  } catch {
+    // Fall through to web.
+  }
+  return 'web'
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 export default function Popup() {
-  const [status,    setStatus]    = useState<ConnectionStatus>('checking')
-  const [dbStatus,  setDbStatus]  = useState('')
-  const [settings,  setSettings]  = useState<Settings>(DEFAULT_SETTINGS)
+  const [status, setStatus] = useState<ConnectionStatus>('checking')
+  const [dbStatus, setDbStatus] = useState('')
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
+
   const [analysing, setAnalysing] = useState(false)
-  const [result,    setResult]    = useState<TriageResult | null>(null)
+  const [progress, setProgress] = useState(0)
+  const [scanStep, setScanStep] = useState('')
+  const [result, setResult] = useState<TriageResult | null>(null)
 
-  // ── Load connection status + user settings on popup open ─────────────────────
+  const [flagging, setFlagging] = useState(false)
+  const [flagMessage, setFlagMessage] = useState('')
+
+  const [meetingBusy, setMeetingBusy] = useState(false)
+  const [meetingStatus, setMeetingStatus] = useState<MeetingModeStatus | null>(null)
+  const [meetingMessage, setMeetingMessage] = useState('')
+
+  const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null)
+
   useEffect(() => {
-    // 1. Health check — direct fetch to the backend /health endpoint.
-    //    AbortSignal.timeout(5000) cancels the request after 5 seconds
-    //    so the popup doesn't hang if the API is slow.
-    //    The /health endpoint returns { status: 'ok', database: 'connected'|'disconnected' }.
-    fetch(`${DEFAULT_SETTINGS.apiBase}/health`, { signal: AbortSignal.timeout(5000) })
-      .then((r) => r.json())
-      .then((data: { status: string; database: string }) => {
-        setStatus('connected')
-        setDbStatus(data.database)   // shown in the status badge: "API connected · DB connected"
-      })
-      .catch(() => setStatus('disconnected'))
-
-    // 2. Load persisted settings from chrome.storage.sync via the background worker.
-    //    The background worker reads storage and replies with { ok: true, data: Settings }.
-    //    We use the background worker rather than calling chrome.storage.sync directly
-    //    here because it centralises storage access in one place.
-    chrome.runtime.sendMessage({ type: 'GET_SETTINGS' }, (res) => {
-      if (res?.ok) setSettings(res.data as Settings)
-    })
+    const id = 'tg-keyframes'
+    if (document.getElementById(id)) return
+    const style = document.createElement('style')
+    style.id = id
+    style.textContent = `
+      @keyframes tgShimmer {
+        0%   { background-position: -200% center; }
+        100% { background-position:  200% center; }
+      }
+    `
+    document.head.appendChild(style)
   }, [])
 
-  // ── Toggle scanning on/off ────────────────────────────────────────────────────
-  // Optimistic update: update local state immediately, then persist to storage.
-  // This makes the toggle feel instant even if storage is slightly slow.
-  function toggleEnabled(): void {
+  useEffect(() => {
+    if (!analysing) {
+      if (progressTimer.current) clearInterval(progressTimer.current)
+      return
+    }
+
+    setProgress(0)
+    setScanStep(SCAN_STEPS[0].label)
+
+    let current = 0
+    progressTimer.current = setInterval(() => {
+      const increment = current < 75 ? Math.random() * 7 + 3 : Math.random() * 0.6 + 0.1
+      current = Math.min(current + increment, 98)
+      setProgress(current)
+      const step = [...SCAN_STEPS].reverse().find((entry) => current >= entry.at)
+      if (step) setScanStep(step.label)
+    }, 300)
+
+    return () => {
+      if (progressTimer.current) clearInterval(progressTimer.current)
+    }
+  }, [analysing])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function initialize() {
+      setStatus('checking')
+      try {
+        const settingsRes = await sendRuntimeMessage<Settings>({ type: 'GET_SETTINGS' })
+        const loaded = settingsRes.ok && settingsRes.data ? settingsRes.data : DEFAULT_SETTINGS
+        if (cancelled) return
+        setSettings(loaded)
+
+        const health = await checkApiHealth(loaded.apiBase)
+        if (cancelled) return
+        setStatus(health.connected ? 'connected' : 'disconnected')
+        setDbStatus(health.database)
+
+        const liveMeeting = await refreshMeetingStatus(false)
+        if (!cancelled) setMeetingStatus(liveMeeting)
+      } catch {
+        if (cancelled) return
+        setStatus('disconnected')
+      }
+    }
+
+    void initialize()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!settings.meetingModeEnabled) return
+    const timer = window.setInterval(() => {
+      void refreshMeetingStatus(false)
+    }, 3000)
+    return () => window.clearInterval(timer)
+  }, [settings.meetingModeEnabled])
+
+  const statusLabel = useMemo(() => {
+    if (status === 'checking') return 'Connecting...'
+    if (status === 'connected') return `API connected - DB ${dbStatus || 'unknown'}`
+    return 'API unreachable'
+  }, [status, dbStatus])
+
+  async function persistPartialSettings(partial: Partial<Settings>) {
+    await sendRuntimeMessage<void>({ type: 'SET_SETTINGS', payload: partial })
+  }
+
+  async function pushSettingsPatchToActiveTab(partial: Partial<Settings>) {
+    const tab = await getActiveTab()
+    if (!tab?.id) return
+    await sendTabMessage<MeetingModeStatus>(tab.id, {
+      type: 'TG_SETTINGS_PATCH',
+      payload: partial,
+    })
+  }
+
+  async function refreshMeetingStatus(showErrors: boolean): Promise<MeetingModeStatus | null> {
+    const tab = await getActiveTab()
+    if (!tab?.id) {
+      if (showErrors) setMeetingMessage('No active browser tab available.')
+      return null
+    }
+
+    const response = await sendTabMessage<MeetingModeStatus>(tab.id, { type: 'TG_GET_MEETING_STATUS' })
+    if (!response.ok || !response.data) {
+      if (showErrors) {
+        setMeetingMessage('Meeting status is available on supported pages (Meet, Zoom, YouTube, etc.).')
+      }
+      return null
+    }
+
+    setMeetingStatus(response.data)
+    return response.data
+  }
+
+  async function toggleEnabled() {
     const next = { ...settings, enabled: !settings.enabled }
     setSettings(next)
-    // SET_SETTINGS in the background worker calls chrome.storage.sync.set()
-    chrome.runtime.sendMessage({ type: 'SET_SETTINGS', payload: { enabled: next.enabled } })
+    await persistPartialSettings({ enabled: next.enabled })
   }
 
-  // ── Change scan sensitivity ────────────────────────────────────────────────────
-  // Sensitivity controls BADGE_THRESHOLD in content/index.ts:
-  //   low    = badge only when confidence ≥ 80%
-  //   medium = badge when confidence ≥ 60%  (default)
-  //   high   = badge when confidence ≥ 40%
-  // The actual threshold logic lives in content/index.ts — this just persists the setting.
-  function changeSensitivity(s: Sensitivity): void {
-    const next = { ...settings, sensitivity: s }
+  async function toggleRedFlag() {
+    const next = { ...settings, redFlagEnabled: !settings.redFlagEnabled }
     setSettings(next)
-    chrome.runtime.sendMessage({ type: 'SET_SETTINGS', payload: { sensitivity: s } })
+    await persistPartialSettings({ redFlagEnabled: next.redFlagEnabled })
+    await pushSettingsPatchToActiveTab({ redFlagEnabled: next.redFlagEnabled })
   }
 
-  // ── Analyse the current browser tab ──────────────────────────────────────────
-  function analyseCurrentTab(): void {
+  async function toggleMeetingMode() {
+    setMeetingBusy(true)
+    setMeetingMessage('')
+
+    try {
+      const nextEnabled = !settings.meetingModeEnabled
+      const nextSettings = { ...settings, meetingModeEnabled: nextEnabled }
+      setSettings(nextSettings)
+      await persistPartialSettings({ meetingModeEnabled: nextEnabled })
+
+      const tab = await getActiveTab()
+      if (!tab?.id) {
+        setMeetingMessage('Meeting mode saved. Open a meeting tab to control scanning.')
+        return
+      }
+
+      const response = await sendTabMessage<MeetingModeStatus>(tab.id, {
+        type: 'TG_SET_MEETING_MODE',
+        payload: { enabled: nextEnabled },
+      })
+
+      if (!response.ok || !response.data) {
+        setMeetingMessage('Meeting mode saved. This tab does not expose camera video elements.')
+        return
+      }
+
+      setMeetingStatus(response.data)
+      setMeetingMessage(nextEnabled ? 'Meeting mode enabled.' : 'Meeting mode disabled.')
+    } catch {
+      setMeetingMessage('Failed to update meeting mode.')
+    } finally {
+      setMeetingBusy(false)
+    }
+  }
+
+  async function runMeetingScanNow() {
+    setMeetingBusy(true)
+    setMeetingMessage('')
+
+    try {
+      const tab = await getActiveTab()
+      if (!tab?.id) {
+        setMeetingMessage('No active tab available.')
+        return
+      }
+
+      const platform = tab.url ? detectPlatform(tab.url) : 'web'
+      if (platform !== 'google_meet' && platform !== 'zoom') {
+        setMeetingMessage('Navigate to Google Meet or Zoom, then try again.')
+        return
+      }
+
+      const response = await sendTabMessage<MeetingModeStatus>(tab.id, { type: 'TG_FORCE_SCAN_MEETING' })
+      if (!response.ok || !response.data) {
+        setMeetingMessage('Could not connect to the meeting tab — try refreshing the page.')
+        return
+      }
+
+      setMeetingStatus(response.data)
+      setMeetingMessage('Meeting scan triggered.')
+    } finally {
+      setMeetingBusy(false)
+    }
+  }
+
+  async function analyseCurrentTab() {
     setAnalysing(true)
     setResult(null)
 
-    // chrome.tabs.query({ active: true, currentWindow: true }) returns the single
-    // tab that is currently visible in the foreground window.
-    // tabs[0]?.url is the URL of that tab — we pass it to POST /api/v1/triage.
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const url = tabs[0]?.url ?? ''
-
-      // Guard: chrome:// and edge:// URLs are internal browser pages that cannot
-      // be analysed (they don't contain public content).
+    try {
+      const tab = await getActiveTab()
+      const url = tab?.url ?? ''
       if (!url || url.startsWith('chrome://')) {
+        await sleep(1200)
         setResult({ verdict: 'UNVERIFIED', confidence: 0, summary: 'Cannot analyse this page.' })
         setAnalysing(false)
         return
       }
 
-      // Direct fetch to the triage endpoint — the popup has permission to do this
-      // directly without going through the background worker.
-      // /api/v1/triage uses Gemini Flash (fast) — ideal for the popup's quick-check use case.
-      fetch(`${settings.apiBase}/api/v1/triage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: `URL: ${url}` }),
-      })
-        .then((r) => r.json())
-        .then((data: TriageResult) => { setResult(data); setAnalysing(false) })
-        .catch(() => {
-          setResult({ verdict: 'UNVERIFIED', confidence: 0, summary: 'API unreachable.' })
-          setAnalysing(false)
-        })
-    })
+      const [response] = await Promise.all([
+        sendRuntimeMessage<TriageResult>({ type: 'ANALYZE_TEXT', payload: `URL: ${url}` }),
+        sleep(2000),
+      ])
+      setProgress(100)
+
+      if (response.ok && response.data) {
+        setResult(response.data)
+        // Forward highlights to the page so phrases are highlighted inline
+        if (tab?.id && response.data.highlights?.length) {
+          void sendTabMessage(tab.id, {
+            type: 'APPLY_PAGE_HIGHLIGHTS',
+            payload: response.data.highlights,
+          })
+        }
+      } else {
+        setResult({ verdict: 'UNVERIFIED', confidence: 0, summary: response.error ?? 'Analysis failed.' })
+      }
+    } catch (err) {
+      setResult({ verdict: 'UNVERIFIED', confidence: 0, summary: (err as Error).message || 'API unreachable.' })
+    } finally {
+      setAnalysing(false)
+    }
   }
 
-  // Status badge label — changes depending on connection state
-  const statusLabel = {
-    checking:     'Connecting…',
-    connected:    `API connected · DB ${dbStatus}`,
-    disconnected: 'API unreachable',
-  }[status]
+  async function submitFlag(reason: string, confidence: number | null = null) {
+    const tab = await getActiveTab()
+    const sourceUrl = tab?.url ?? ''
 
-  // Colour for the result card border/background — based on verdict
-  const vColor = result ? (VERDICT_COLORS[result.verdict] ?? C.muted) : C.muted
+    if (!sourceUrl || !/^https?:\/\//.test(sourceUrl)) {
+      throw new Error('No valid page URL to flag.')
+    }
+
+    const location = await getCurrentLocation()
+    const response = await sendRuntimeMessage<VideoFlagResult>({
+      type: 'FLAG_VIDEO',
+      payload: {
+        sourceUrl,
+        platform: detectPlatform(sourceUrl),
+        category: 'Deepfake',
+        reason,
+        confidence,
+        location,
+      },
+    })
+
+    if (!response.ok || !response.data?.ok) {
+      throw new Error(response.error ?? 'Failed to submit flag.')
+    }
+
+    const eventLabel = response.data.event?.label ?? 'location'
+    setFlagMessage(`Flag submitted. Heatmap marker added for ${eventLabel}.`)
+  }
+
+  async function flagCurrentVideo() {
+    setFlagging(true)
+    setFlagMessage('')
+
+    try {
+      await submitFlag('user_suspected_ai_video')
+    } catch (err) {
+      setFlagMessage((err as Error).message || 'Flag submission failed.')
+    } finally {
+      setFlagging(false)
+    }
+  }
+
+  async function flagMeetingFeed() {
+    setFlagging(true)
+    setFlagMessage('')
+
+    try {
+      const statusNow = await refreshMeetingStatus(true)
+      if (!statusNow) {
+        setFlagMessage('No meeting status available yet.')
+        return
+      }
+
+      if (!statusNow.meetingHost) {
+        setFlagMessage('Open Google Meet or Zoom web tab, then try again.')
+        return
+      }
+
+      const risk = statusNow.latestRiskScore
+      if (risk == null || risk < 40) {
+        setFlagMessage('No strong AI risk detected yet. Keep meeting mode running for 15-30s.')
+        return
+      }
+
+      await submitFlag('meeting_mode_suspected_ai_video', risk)
+    } catch (err) {
+      setFlagMessage((err as Error).message || 'Meeting flag submission failed.')
+    } finally {
+      setFlagging(false)
+    }
+  }
+
+  const verdictColor = result ? VERDICT_COLORS[result.verdict] ?? C.muted : C.muted
 
   return (
-    <div style={{ width: 320, padding: 16, fontFamily: 'system-ui,-apple-system,sans-serif', background: C.bg, color: C.text, minHeight: 220 }}>
-
-      {/* ── Header: logo + title + ON/OFF toggle ── */}
+    <div
+      style={{
+        width: 340,
+        padding: 16,
+        fontFamily: 'system-ui,-apple-system,sans-serif',
+        background: C.bg,
+        color: C.text,
+        minHeight: 320,
+      }}
+    >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-        {/* Shield SVG icon */}
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={C.accent}
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
         </svg>
         <span style={{ fontSize: 17, fontWeight: 700, color: C.accent }}>TruthGuard</span>
 
-        {/* ON/OFF toggle — right-aligned with marginLeft: auto */}
         <button
-          onClick={toggleEnabled}
+          onClick={() => void toggleEnabled()}
           title={settings.enabled ? 'Disable scanning' : 'Enable scanning'}
           style={{
             marginLeft: 'auto',
-            padding: '3px 10px',
+            width: 56,
+            height: 24,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             borderRadius: 12,
             fontSize: 11,
             fontWeight: 700,
             background: settings.enabled ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.12)',
-            color:      settings.enabled ? C.accent : C.red,
-            border:     `1px solid ${settings.enabled ? 'rgba(16,185,129,0.35)' : 'rgba(239,68,68,0.3)'}`,
+            color: settings.enabled ? C.accent : C.red,
+            border: `1px solid ${settings.enabled ? 'rgba(16,185,129,0.35)' : 'rgba(239,68,68,0.3)'}`,
             cursor: 'pointer',
           }}
         >
@@ -228,70 +557,238 @@ export default function Popup() {
         </button>
       </div>
 
-      <div style={{ fontSize: 11, color: C.muted, marginBottom: 12 }}>Misinformation &amp; Deepfake Detection</div>
+      <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Misinformation and Deepfake Detection</div>
 
-      {/* ── Connection status badge ──
-           Green = API connected, grey = still checking, red = unreachable */}
-      <div style={{
-        display: 'inline-flex', alignItems: 'center', gap: 6,
-        padding: '5px 9px', borderRadius: 6, fontSize: 11, marginBottom: 12,
-        background: status === 'connected' ? '#064e3b' : status === 'checking' ? '#1e293b' : '#450a0a',
-        color:      status === 'connected' ? C.accent  : status === 'checking' ? C.muted   : '#fca5a5',
-        border: '1px solid',
-        borderColor: status === 'connected' ? '#065f46' : status === 'checking' ? '#334155' : '#7f1d1d',
-      }}>
-        <div style={{ width: 6, height: 6, borderRadius: '50%', background: status === 'connected' ? C.accent : status === 'checking' ? C.muted : '#f87171' }} />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <span style={{ fontSize: 11, color: C.muted }}>Background protection (Red-Flag)</span>
+        <button
+          onClick={() => void toggleRedFlag()}
+          disabled={!settings.enabled}
+          title={settings.redFlagEnabled ? 'Disable deepfake video scanning' : 'Enable deepfake video scanning'}
+          style={{
+            width: 56,
+            height: 24,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: 12,
+            fontSize: 11,
+            fontWeight: 700,
+            background: settings.redFlagEnabled ? 'rgba(245,158,11,0.15)' : 'rgba(100,116,139,0.15)',
+            color: settings.redFlagEnabled ? C.amber : C.muted,
+            border: `1px solid ${settings.redFlagEnabled ? 'rgba(245,158,11,0.4)' : 'rgba(100,116,139,0.3)'}`,
+            cursor: settings.enabled ? 'pointer' : 'not-allowed',
+            opacity: settings.enabled ? 1 : 0.45,
+          }}
+        >
+          {settings.redFlagEnabled ? 'ON' : 'OFF'}
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <span style={{ fontSize: 11, color: C.muted }}>Meeting mode (Meet / Zoom)</span>
+        <button
+          onClick={() => void toggleMeetingMode()}
+          disabled={!settings.enabled || meetingBusy}
+          style={{
+            width: 56,
+            height: 24,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: 12,
+            fontSize: 11,
+            fontWeight: 700,
+            background: settings.meetingModeEnabled ? 'rgba(99,102,241,0.2)' : 'rgba(100,116,139,0.15)',
+            color: settings.meetingModeEnabled ? C.violet : C.muted,
+            border: `1px solid ${settings.meetingModeEnabled ? 'rgba(99,102,241,0.4)' : 'rgba(100,116,139,0.3)'}`,
+            cursor: meetingBusy ? 'wait' : settings.enabled ? 'pointer' : 'not-allowed',
+            opacity: settings.enabled && !meetingBusy ? 1 : 0.45,
+          }}
+        >
+          {settings.meetingModeEnabled ? 'ON' : 'OFF'}
+        </button>
+      </div>
+
+      <div
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '5px 9px',
+          borderRadius: 6,
+          fontSize: 11,
+          marginBottom: 10,
+          background: status === 'connected' ? '#064e3b' : status === 'checking' ? '#1e293b' : '#450a0a',
+          color: status === 'connected' ? C.accent : status === 'checking' ? C.muted : '#fca5a5',
+          border: '1px solid',
+          borderColor: status === 'connected' ? '#065f46' : status === 'checking' ? '#334155' : '#7f1d1d',
+        }}
+      >
+        <div
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: '50%',
+            background: status === 'connected' ? C.accent : status === 'checking' ? C.muted : '#f87171',
+          }}
+        />
         {statusLabel}
       </div>
 
-      {/* ── Sensitivity selector ── */}
-      <div style={{ marginBottom: 12 }}>
-        <p style={{ fontSize: 11, color: C.muted, marginBottom: 6 }}>Scan sensitivity</p>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {(['low', 'medium', 'high'] as Sensitivity[]).map((s) => (
-            <button
-              key={s}
-              onClick={() => changeSensitivity(s)}
-              style={{
-                flex: 1, padding: '4px 0', borderRadius: 5, fontSize: 11, fontWeight: 600,
-                cursor: 'pointer', textTransform: 'capitalize',
-                background: settings.sensitivity === s ? 'rgba(99,102,241,0.2)' : C.surface,
-                color:      settings.sensitivity === s ? C.violet : C.muted,
-                border:     `1px solid ${settings.sensitivity === s ? 'rgba(99,102,241,0.4)' : C.border}`,
-              }}
-            >
-              {s}
-            </button>
-          ))}
+      {meetingStatus && (
+        <div
+          style={{
+            marginBottom: 10,
+            padding: '8px 10px',
+            borderRadius: 8,
+            background: 'rgba(15,23,42,0.5)',
+            border: '1px solid rgba(99,102,241,0.25)',
+            fontSize: 10,
+            lineHeight: 1.5,
+            color: '#a5b4fc',
+          }}
+        >
+          <div>Meeting host: {meetingStatus.meetingHost ? 'yes' : 'no'}</div>
+          <div>Detected videos: {meetingStatus.activeVideos}</div>
+          <div>Sampled frames: {meetingStatus.sampledFrames}</div>
+          <div>
+            Deepfake risk: {meetingStatus.latestRiskScore == null ? '--' : `${meetingStatus.latestRiskScore}% (${meetingStatus.latestLabel === 'SUSPECTED_FAKE' ? 'AI suspected' : meetingStatus.latestLabel === 'REAL' ? 'looks real' : 'unverified'})`}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* ── "Analyse this page" button ──
-           Disabled if: currently analysing, scanning is OFF, or API is unreachable.
-           The button uses the current tab URL and calls POST /api/v1/triage directly. */}
+      {meetingMessage && (
+        <p style={{ fontSize: 11, color: C.muted, lineHeight: 1.4, margin: '0 0 8px' }}>{meetingMessage}</p>
+      )}
+
       <button
-        onClick={analyseCurrentTab}
-        disabled={analysing || !settings.enabled || status !== 'connected'}
+        onClick={() => void runMeetingScanNow()}
+        disabled={meetingBusy || status !== 'connected' || !settings.meetingModeEnabled}
         style={{
-          width: '100%', padding: '7px 0', borderRadius: 7, fontSize: 12,
-          fontWeight: 600, cursor: analysing ? 'wait' : 'pointer',
-          background: 'rgba(99,102,241,0.15)', color: C.violet,
-          border: '1px solid rgba(99,102,241,0.35)', marginBottom: 10,
-          opacity: (analysing || !settings.enabled || status !== 'connected') ? 0.45 : 1,
+          width: '100%',
+          padding: '7px 0',
+          borderRadius: 7,
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: meetingBusy ? 'wait' : 'pointer',
+          background: 'rgba(52,211,153,0.12)',
+          color: C.accent,
+          border: '1px solid rgba(52,211,153,0.35)',
+          marginBottom: 8,
+          opacity: meetingBusy || status !== 'connected' || !settings.meetingModeEnabled ? 0.45 : 1,
         }}
       >
-        {analysing ? 'Analysing…' : '🔍 Analyse this page'}
+        {meetingBusy ? 'Scanning meeting...' : 'Scan camera feeds now'}
       </button>
 
-      {/* ── Result card (shown after a successful triage call) ── */}
+      <button
+        onClick={() => void analyseCurrentTab()}
+        disabled={analysing || !settings.enabled || status !== 'connected'}
+        style={{
+          width: '100%',
+          padding: '7px 0',
+          borderRadius: 7,
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: analysing ? 'wait' : 'pointer',
+          background: 'rgba(99,102,241,0.15)',
+          color: C.violet,
+          border: '1px solid rgba(99,102,241,0.35)',
+          marginBottom: 8,
+          opacity: analysing || !settings.enabled || status !== 'connected' ? 0.45 : 1,
+        }}
+      >
+        {analysing ? 'Analysing...' : 'Analyze this page'}
+      </button>
+
+      {analysing && (
+        <div style={{ marginBottom: 8 }}>
+          <div
+            style={{
+              height: 4,
+              borderRadius: 4,
+              background: 'rgba(255,255,255,0.07)',
+              overflow: 'hidden',
+              marginBottom: 5,
+            }}
+          >
+            <div
+              style={{
+                height: '100%',
+                width: `${progress}%`,
+                borderRadius: 4,
+                background: `linear-gradient(90deg, ${C.violet} 0%, #a5b4fc 50%, ${C.violet} 100%)`,
+                backgroundSize: '200% 100%',
+                animation: 'tgShimmer 1.4s linear infinite',
+                transition: 'width 0.28s ease-out',
+              }}
+            />
+          </div>
+          <span style={{ fontSize: 10, color: C.muted }}>{scanStep}</span>
+        </div>
+      )}
+
+      <button
+        onClick={() => void flagMeetingFeed()}
+        disabled={flagging || status !== 'connected'}
+        style={{
+          width: '100%',
+          padding: '7px 0',
+          borderRadius: 7,
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: flagging ? 'wait' : 'pointer',
+          background: 'rgba(239,68,68,0.13)',
+          color: '#fca5a5',
+          border: '1px solid rgba(239,68,68,0.35)',
+          marginBottom: 8,
+          opacity: flagging || status !== 'connected' ? 0.45 : 1,
+        }}
+      >
+        {flagging ? 'Submitting flag...' : 'Flag suspicious meeting feed'}
+      </button>
+
+      <button
+        onClick={() => void flagCurrentVideo()}
+        disabled={flagging || status !== 'connected'}
+        style={{
+          width: '100%',
+          padding: '7px 0',
+          borderRadius: 7,
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: flagging ? 'wait' : 'pointer',
+          background: 'rgba(245,158,11,0.12)',
+          color: C.amber,
+          border: '1px solid rgba(245,158,11,0.35)',
+          marginBottom: 10,
+          opacity: flagging || status !== 'connected' ? 0.45 : 1,
+        }}
+      >
+        {flagging ? 'Submitting flag...' : 'Flag current page media'}
+      </button>
+
       {result && (
-        <div style={{
-          padding: '10px 12px', borderRadius: 8,
-          background: `rgba(${vColor === C.accent ? '16,185,129' : '99,102,241'},0.08)`,
-          border: `1px solid ${vColor}40`,
-        }}>
+        <div
+          style={{
+            padding: '10px 12px',
+            borderRadius: 8,
+            background: `rgba(${verdictColor === C.accent ? '16,185,129' : '99,102,241'},0.08)`,
+            border: `1px solid ${verdictColor}40`,
+            marginBottom: 8,
+          }}
+        >
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: vColor, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: verdictColor,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+              }}
+            >
               {result.verdict}
             </span>
             <span style={{ fontSize: 11, color: C.muted }}>{result.confidence}% confidence</span>
@@ -300,25 +797,39 @@ export default function Popup() {
         </div>
       )}
 
-      {/* ── Usage hint (shown when no result yet) ── */}
-      {!result && (
-        <p style={{ fontSize: 11, color: C.muted, lineHeight: 1.55 }}>
-          Highlight text on any page and right-click → <em style={{ color: '#94a3b8' }}>Analyze with TruthGuard</em>.
-        </p>
+      {flagMessage && (
+        <p style={{ fontSize: 11, color: C.muted, lineHeight: 1.4, margin: '0 0 8px' }}>{flagMessage}</p>
       )}
 
-      {/* ── Footer ── */}
-      <div style={{ fontSize: 10, color: '#334155', borderTop: '1px solid #1e293b', paddingTop: 8, marginTop: 10, display: 'flex', justifyContent: 'space-between' }}>
-        <span>Phase 4 · v0.1.0</span>
-        {/* TODO: Make this dynamic — derive from settings.apiBase */}
-        <a
-          href="http://localhost:5173"
-          target="_blank"
-          rel="noreferrer"
-          style={{ color: C.violet, textDecoration: 'none' }}
+      <div
+        style={{
+          borderTop: '1px solid #1e293b',
+          paddingTop: 8,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <p style={{ fontSize: 10, color: '#334155', lineHeight: 1.4, margin: 0, flex: 1 }}>
+          AI assessment is probabilistic, not guaranteed. Always verify from primary sources.
+        </p>
+        <button
+          onClick={() => chrome.tabs.create({ url: 'http://localhost:5173' })}
+          title="Open TruthGuard dashboard"
+          style={{
+            marginLeft: 10,
+            flexShrink: 0,
+            background: 'none',
+            border: 'none',
+            color: C.accent,
+            fontSize: 10,
+            cursor: 'pointer',
+            padding: 0,
+            textDecoration: 'underline',
+          }}
         >
-          Open Web App ↗
-        </a>
+          Open Dashboard {'->'}
+        </button>
       </div>
     </div>
   )

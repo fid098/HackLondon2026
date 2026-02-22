@@ -51,7 +51,7 @@ import { getHeatmapEvents, openHeatmapStream } from '../lib/api'
 /* ─── Category filter pills ──────────────────────────────────────────────── */
 // These map to the `category` field on HeatmapEvent and NarrativeItem.
 // To add a new category: add it here AND ensure your backend data uses the same string.
-const CATEGORIES = ['All', 'Health', 'Politics', 'Finance', 'Science', 'Conflict', 'Climate']
+const CATEGORIES = ['All', 'Health', 'Politics', 'Finance', 'Science', 'Conflict', 'Climate', 'Deepfake']
 
 /* ─── Fallback region stats ──────────────────────────────────────────────── */
 // Used when the backend is unavailable. In production these are replaced

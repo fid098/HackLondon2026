@@ -1,5 +1,5 @@
 # TruthGuard API — Python dependencies
-# Pin to minor versions to avoid surprise breakage; upgrade deliberately.
+# Note: loose pins used where Python 3.14 wheels require newer versions.
 
 # ─── Web framework ────────────────────────────────────────────────
 fastapi==0.111.1
@@ -10,8 +10,8 @@ motor==3.5.0           # Async MongoDB driver (wraps pymongo with asyncio)
 pymongo==4.8.0         # Sync driver (used by motor internally + for scripts)
 
 # ─── Validation / settings ────────────────────────────────────────
-pydantic[email]==2.8.2
-pydantic-settings==2.3.4
+pydantic[email]>=2.10.0    # 2.8.x has no Python 3.14 wheels
+pydantic-settings>=2.3.4
 
 # ─── Auth (Phase 1) ───────────────────────────────────────────────
 python-jose[cryptography]==3.3.0
@@ -26,15 +26,20 @@ python-multipart==0.0.9
 # ─── Utilities ────────────────────────────────────────────────────
 python-dotenv==1.0.1
 
+# ─── Article / HTML extraction ────────────────────────────────────
+beautifulsoup4==4.12.3    # HTML parsing for article content extraction
+lxml>=5.3.0               # Fast BS4 parser backend (5.2.x has no Python 3.14 wheels)
+youtube-transcript-api==0.6.2  # YouTube transcript fetching (optional)
+
 # ─── Google AI (lazy-imported in real mode only) ──────────────────
-google-generativeai==0.7.2
+google-genai>=1.0.0       # New HTTP-based SDK; replaces google-generativeai
 
 # ─── Testing ──────────────────────────────────────────────────────
 pytest==8.3.2
 pytest-asyncio==0.23.8
-anyio[trio]==4.4.0     # Async test backend
+anyio[trio]>=4.8.0        # google-genai requires >=4.8.0
 
-# ─── Rate limiting (Phase 7) ──────────────────────────────────────
+# ─── Rate limiting ────────────────────────────────────────────────
 slowapi==0.1.9            # Starlette/FastAPI rate limiting (wraps limits library)
 
 # ─── Linting / formatting ─────────────────────────────────────────
