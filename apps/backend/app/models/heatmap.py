@@ -42,13 +42,9 @@ The lat/lng fields in HeatmapEvent can then be populated directly from
 `coordinates[1]` and `coordinates[0]` in the aggregation $project stage.
 """
 
-<<<<<<< HEAD
 from typing import Optional
 
-from pydantic import BaseModel
-=======
 from pydantic import BaseModel, Field
->>>>>>> origin/main
 
 
 class HeatmapEvent(BaseModel):
@@ -143,19 +139,13 @@ class SimulateResponse(BaseModel):
 class StreamEvent(BaseModel):
     """Single frame pushed over the WebSocket stream."""
 
-<<<<<<< HEAD
-    type:      str            # "event"
-    message:   str            # human-readable feed entry
-    delta:     int            # count increment since last frame
-    timestamp: str            # ISO-8601
-    severity:  Optional[str] = None   # "high" | "medium" | "low"
-    city:      Optional[str] = None   # originating city label
-    category:  Optional[str] = None   # narrative category
-=======
-    type: str             # "event"
-    message: str          # human-readable feed entry
-    delta: int            # count increment since last frame
-    timestamp: str        # ISO-8601
+    type: str                      # "event"
+    message: str                   # human-readable feed entry
+    delta: int                     # count increment since last frame
+    timestamp: str                 # ISO-8601
+    severity: Optional[str] = None # "high" | "medium" | "low"
+    city: Optional[str] = None     # originating city label
+    category: Optional[str] = None # narrative category
 
 
 class GeoPoint(BaseModel):
@@ -184,4 +174,3 @@ class HeatmapFlagResponse(BaseModel):
     ok: bool
     id: str | None = None
     event: HeatmapEvent
->>>>>>> origin/main
