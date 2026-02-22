@@ -33,14 +33,19 @@
  */
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { getHeatmapEvents, openHeatmapStream, runSimulation } from '../lib/api'
-// getHeatmapArcs is imported when the /api/v1/heatmap/arcs endpoint is live:
-// import { getHeatmapEvents, openHeatmapStream, getHeatmapArcs, runSimulation } from '../lib/api'
+import { getHeatmapEvents } from '../lib/api'
 import Globe from 'react-globe.gl'
+
+import { SimulationProvider } from '../context/SimulationContext'
+import { useLiveEventFeed }   from '../hooks/useLiveEventFeed'
+import TopControlBar          from '../components/heatmap/TopControlBar'
+import LeftControlPanel       from '../components/heatmap/LeftControlPanel'
+import RightSimulationPanel   from '../components/heatmap/RightSimulationPanel'
+import GlobeOverlayLayer      from '../components/heatmap/GlobeOverlayLayer'
 
 /* ─── Constants ──────────────────────────────────────────────────────────── */
 
-const CATEGORIES = ['All', 'Health', 'Politics', 'Finance', 'Science', 'Conflict', 'Climate']
+/* CATEGORIES moved to RightSimulationPanel.jsx */
 
 const REGIONS = [
   { name: 'North America', events: 847,  delta: +12, severity: 'high'   },
@@ -178,19 +183,7 @@ const HOTSPOTS = [
   },
 ]
 
-/**
- * MOCK_ALERTS — Alert feed.
- * API INTEGRATION: Replace with GET /api/v1/alerts or WS /api/v1/alerts/stream
- * MongoDB: db.reports.aggregate spike + coordination detection queries.
- */
-const MOCK_ALERTS = [
-  { id: 1, type: 'coordinated', city: 'Moscow',   msg: 'Coordinated campaign — 94% confidence', sev: 'high',   time: '1m ago'  },
-  { id: 2, type: 'spike',       city: 'London',   msg: 'Spike anomaly: +187% vs 7-day baseline', sev: 'high',   time: '3m ago'  },
-  { id: 3, type: 'coordinated', city: 'Beijing',  msg: 'Coordinated amplification detected',     sev: 'high',   time: '6m ago'  },
-  { id: 4, type: 'spike',       city: 'Delhi',    msg: 'Event surge: +145% in last hour',         sev: 'medium', time: '11m ago' },
-  { id: 5, type: 'coordinated', city: 'Tehran',   msg: 'State-linked network activity',           sev: 'high',   time: '14m ago' },
-  { id: 6, type: 'spike',       city: 'New York', msg: 'Health narrative spike detected',         sev: 'medium', time: '22m ago' },
-]
+/* MOCK_ALERTS moved to LeftControlPanel.jsx */
 
 const NARRATIVES = [
   { rank: 1, title: 'Vaccine microchip conspiracy resurfaces ahead of flu season',   category: 'Health',   volume: 14200, trend: 'up'   },
@@ -201,32 +194,7 @@ const NARRATIVES = [
   { rank: 6, title: '"Miracle cure" claims spread via encrypted messaging apps',    category: 'Health',   volume: 5100,  trend: 'same' },
 ]
 
-const FEED_ITEMS = [
-  'New event detected · Health · Jakarta',
-  'Spike alert · Politics · Washington DC (+34%)',
-  'Cluster identified · Finance · London',
-  'Narrative variant · Climate · Berlin',
-  'Agent verdict: FALSE · Health · New York',
-  'Trending narrative · Science · Tokyo',
-]
-
-/**
- * INITIAL_FEED_HISTORY — pre-loaded bottom feed entries.
- * API INTEGRATION: Replace with last N events from GET /api/v1/heatmap/feed?limit=50
- * or replay from WS on connect (server sends last 20 events on open).
- */
-const INITIAL_FEED_HISTORY = [
-  { id: 1,  time: '04:58:09', msg: 'Deepfake audio campaign detected',      city: 'Moscow',    category: 'Politics', sev: 'high'   },
-  { id: 2,  time: '04:59:41', msg: 'Narrative variant spreading',           city: 'New York',  category: 'Health',   sev: 'high'   },
-  { id: 3,  time: '05:01:14', msg: 'Coordinated amplification active',      city: 'Beijing',   category: 'Science',  sev: 'high'   },
-  { id: 4,  time: '05:02:58', msg: 'Climate data manipulation detected',    city: 'Berlin',    category: 'Climate',  sev: 'medium' },
-  { id: 5,  time: '05:04:22', msg: 'Finance rumour gaining traction',       city: 'Tokyo',     category: 'Finance',  sev: 'medium' },
-  { id: 6,  time: '05:06:47', msg: 'Conflict footage misattributed',        city: 'Tehran',    category: 'Conflict', sev: 'high'   },
-  { id: 7,  time: '05:09:03', msg: 'Spike anomaly: +145% in last hour',    city: 'Delhi',     category: 'Health',   sev: 'medium' },
-  { id: 8,  time: '05:11:55', msg: 'State-linked network activity',         city: 'Moscow',    category: 'Politics', sev: 'high'   },
-  { id: 9,  time: '05:14:28', msg: 'Coordinated campaign forming',          city: 'London',    category: 'Health',   sev: 'high'   },
-  { id: 10, time: '05:17:12', msg: 'Agent verdict: FALSE',                  city: 'São Paulo', category: 'Politics', sev: 'medium' },
-]
+/* FEED_ITEMS and INITIAL_FEED_HISTORY moved to hooks/useLiveEventFeed.js */
 
 
 const SEV = {
@@ -258,16 +226,16 @@ const sectionHeader = {
   fontSize: 9, fontWeight: 700, color: '#334155',
   textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8,
 }
-const panelBg = { background: 'rgba(8,12,22,0.92)' }
-const divider  = { borderBottom: '1px solid rgba(255,255,255,0.06)' }
+/* panelBg and divider moved to panel components */
 
 /* ─── Component ──────────────────────────────────────────────────────────── */
 
 export default function Heatmap() {
 
+  /* ── Live feed + WS state — managed by hook ── */
+  const { liveFeed, feedHistory, totalEvents, autoScroll, setAutoScroll } = useLiveEventFeed()
+
   /* ── Existing state ── */
-  const [liveFeed,    setLiveFeed]    = useState(FEED_ITEMS[0])
-  const [totalEvents, setTotalEvents] = useState(55234)
   const [hotspots,    setHotspots]    = useState(HOTSPOTS)
   const [regions,     setRegions]     = useState(REGIONS)
   const [narratives,  setNarratives]  = useState(NARRATIVES)
@@ -294,13 +262,8 @@ export default function Heatmap() {
   /* ── Feature 5: Hotspot Detection Panel ── */
   const [selectedHotspot, setSelectedHotspot] = useState(null)
 
-  /* ── Feature 11: Simulation ── */
-  const [simulationRunning, setSimulationRunning] = useState(false)
-  const [simResult,         setSimResult]         = useState(null)
-
-  /* ── Feature 10: Bottom AI feed ── */
-  const [feedHistory, setFeedHistory] = useState(INITIAL_FEED_HISTORY)
-  const [autoScroll,  setAutoScroll]  = useState(true)
+  /* Feature 11 simulation state is managed by SimulationContext + useSimulation hook */
+  /* Feature 10 feed state (feedHistory, autoScroll) comes from useLiveEventFeed above */
 
   /* ── Feature 9: Geolocation ── */
   const [userLocation,  setUserLocation]  = useState(null)
@@ -308,7 +271,6 @@ export default function Heatmap() {
 
   const mapRef   = useRef(null)
   const globeRef = useRef(null)
-  const wsRef    = useRef(null)
   const feedRef  = useRef(null)
 
   /* ── Live clock ── */
@@ -352,7 +314,7 @@ export default function Heatmap() {
       setHotspots(data.events)
       setRegions(data.regions)
       setNarratives(data.narratives)
-      setTotalEvents(data.total_events)
+      // totalEvents is managed by useLiveEventFeed (WebSocket stream)
     } catch (_) { /* keep mock data */ }
   }, [])
 
@@ -362,49 +324,7 @@ export default function Heatmap() {
     return () => clearInterval(id)
   }, [fetchHeatmap])
 
-  /* ── WebSocket live feed ──
-   * API INTEGRATION: openHeatmapStream() → WS /api/v1/heatmap/stream
-   * Msg shape: { type, message, city?, category?, severity?, delta, timestamp }
-   * On connect, server should replay last 20 events so feed is pre-populated.
-   */
-  useEffect(() => {
-    let fallbackId
-    try {
-      const ws = openHeatmapStream((msg) => {
-        if (msg.message) setLiveFeed(msg.message)
-        if (msg.delta)   setTotalEvents(n => n + msg.delta)
-        if (msg.message) {
-          setFeedHistory(prev => [...prev, {
-            id: Date.now(),
-            time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-            msg:      msg.message,
-            city:     msg.city     ?? '—',
-            category: msg.category ?? 'Unknown',
-            sev:      msg.severity ?? 'medium',
-          }].slice(-200))
-        }
-      })
-      wsRef.current = ws
-    } catch {
-      let idx = 0
-      fallbackId = setInterval(() => {
-        idx = (idx + 1) % FEED_ITEMS.length
-        const raw = FEED_ITEMS[idx]
-        const parts = raw.split(' · ')
-        setLiveFeed(raw)
-        setTotalEvents(n => n + Math.floor(Math.random() * 8))
-        setFeedHistory(prev => [...prev, {
-          id:       Date.now(),
-          time:     new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-          msg:      parts[0] ?? raw,
-          city:     parts[2] ?? '—',
-          category: parts[1] ?? 'Unknown',
-          sev:      raw.includes('Spike') || raw.includes('FALSE') || raw.includes('alert') ? 'high' : 'medium',
-        }].slice(-200))
-      }, 3000)
-    }
-    return () => { wsRef.current?.close(); if (fallbackId) clearInterval(fallbackId) }
-  }, [])
+  /* WS live feed moved to hooks/useLiveEventFeed.js */
 
   /* ── Feature 2: Playback ── */
   useEffect(() => {
@@ -484,45 +404,7 @@ export default function Heatmap() {
     return base + boost
   }, [vizMode])
 
-  /* ── Feature 11: Track Narrative globally ──
-   * API INTEGRATION: POST /api/v1/heatmap/track-narrative
-   * Body: { narrative_id: selectedHotspot.narrativeId, category: selectedHotspot.category }
-   * Response: { watch_id: string } — stores a server-side watch for this narrative.
-   */
-  const trackNarrative = useCallback(() => {
-    if (!selectedHotspot) return
-    setMultiCats(new Set([selectedHotspot.category]))
-    setSelectedHotspot(null)
-  }, [selectedHotspot])
-
-  /* ── Feature 11: Predictive Spread Simulation ──
-   * API INTEGRATION: POST /api/v1/heatmap/simulate
-   * Body: { hotspot_label, category, time_horizon_hours: 48 }
-   * Response: { projected_spread: [{lat, lng, projectedCount}], confidence: number }
-   * Uses historical velocity + virality_score to project spread adjacency.
-   */
-  const handleRunSimulation = useCallback(async () => {
-    if (simulationRunning) return
-    setSimulationRunning(true)
-    setSimResult(null)
-    try {
-      const result = await runSimulation({
-        hotspot_label:      selectedHotspot?.label,
-        category:           selectedHotspot?.category,
-        time_horizon_hours: 48,
-      })
-      setSimResult(result)
-    } catch (_) {
-      // Mock result while backend endpoint isn't yet implemented
-      setSimResult({
-        confidence: 0.74,
-        model: 'velocity-diffusion-v1',
-        projected_spread: [{ city: 'Warsaw', projectedCount: 180 }, { city: 'Prague', projectedCount: 120 }],
-      })
-    } finally {
-      setSimulationRunning(false)
-    }
-  }, [simulationRunning, selectedHotspot])
+  /* Feature 11 simulation + trackNarrative moved to hooks/useSimulation.js + RightSimulationPanel */
 
   /* ── Derived data ── */
 
@@ -551,10 +433,10 @@ export default function Heatmap() {
   const maxSeverity = globeSpots.some(s => s.severity === 'high')   ? 'HIGH'
                     : globeSpots.some(s => s.severity === 'medium') ? 'MEDIUM' : 'LOW'
   const maxSevColor = maxSeverity === 'HIGH' ? '#ef4444' : maxSeverity === 'MEDIUM' ? '#f59e0b' : '#10b981'
-  const timeStr     = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 
   /* ── Render ── */
   return (
+    <SimulationProvider>
     <div style={{
       position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column',
       background: '#04070f', color: '#cbd5e1',
@@ -563,57 +445,14 @@ export default function Heatmap() {
     }}>
 
       {/* ══════════════════════ TOP BAR ══════════════════════ */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 20px', height: 48,
-        background: 'rgba(4,7,15,0.98)',
-        borderBottom: '1px solid rgba(255,255,255,0.07)',
-        flexShrink: 0, gap: 16, zIndex: 20,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 17, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>
-            <span style={{ color: '#818cf8' }}>ver</span>ify
-          </span>
-          <span style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.1)' }} />
-          <span style={{ fontSize: 11, color: '#475569', fontWeight: 500 }}>Intelligence Heatmap</span>
-        </div>
-
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 7,
-          padding: '5px 14px', borderRadius: 7,
-          background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.25)',
-          fontSize: 11, fontWeight: 600, color: '#60a5fa',
-        }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3b82f6', boxShadow: '0 0 6px #3b82f6' }} />
-          Live Monitoring
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {/* Feature 4: Volume / Risk toggle */}
-          <div style={{ display: 'flex', gap: 2, background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: 2 }}>
-            {['volume', 'risk'].map(m => (
-              <button key={m} onClick={() => setVizMode(m)} style={{
-                padding: '3px 10px', borderRadius: 4, fontSize: 9, fontWeight: 700,
-                cursor: 'pointer', border: 'none', textTransform: 'uppercase', letterSpacing: '0.06em',
-                background: vizMode === m ? 'rgba(59,130,246,0.25)' : 'transparent',
-                color: vizMode === m ? '#60a5fa' : '#475569', transition: 'all 0.15s',
-              }}>
-                {m === 'volume' ? 'Volume' : 'Risk'}
-              </button>
-            ))}
-          </div>
-          <div style={{
-            padding: '3px 10px', borderRadius: 5,
-            background: `${maxSevColor}18`, border: `1px solid ${maxSevColor}50`,
-            fontSize: 10, fontWeight: 800, color: maxSevColor, letterSpacing: '0.08em',
-          }}>
-            RISK: {maxSeverity}
-          </div>
-          <span style={{ fontSize: 11, color: '#334155', fontFamily: 'monospace' }}>
-            Last updated:&nbsp;<span style={{ color: '#64748b' }}>{timeStr}</span>
-          </span>
-        </div>
-      </div>
+      <TopControlBar
+        vizMode={vizMode}
+        setVizMode={setVizMode}
+        now={now}
+        maxSeverity={maxSeverity}
+        maxSevColor={maxSevColor}
+        totalEvents={totalEvents}
+      />
 
       {/* ══════════════════════ MAIN CONTENT ══════════════════════ */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
@@ -622,175 +461,21 @@ export default function Heatmap() {
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
 
           {/* ════ LEFT PANEL ════ */}
-          <div style={{
-            width: 258, flexShrink: 0, display: 'flex', flexDirection: 'column',
-            borderRight: '1px solid rgba(255,255,255,0.07)', overflowY: 'auto', ...panelBg,
-          }}>
-            <div style={{
-              padding: '9px 15px', ...divider,
-              fontSize: 10, fontWeight: 700, color: '#3b82f6',
-              letterSpacing: '0.1em', textTransform: 'uppercase',
-              display: 'flex', alignItems: 'center', gap: 7,
-            }}>
-              <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#3b82f6', boxShadow: '0 0 5px #3b82f6' }} />
-              Target + Live Feed
-            </div>
-
-            {/* Latest event */}
-            <div style={{ padding: '10px 15px', ...divider }}>
-              <p style={sectionHeader}>Latest Event</p>
-              <p key={liveFeed} style={{ fontSize: 11, color: '#64748b', lineHeight: 1.55 }}>{liveFeed}</p>
-            </div>
-
-            {/* Total events */}
-            <div style={{ padding: '10px 15px', ...divider }}>
-              <p style={sectionHeader}>Events Tracked</p>
-              <p style={{ fontSize: 28, fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: '-0.02em' }}>
-                {totalEvents.toLocaleString()}
-              </p>
-              <p style={{ fontSize: 10, color: '#334155', marginTop: 3 }}>updated every 30 s</p>
-            </div>
-
-            {/* Feature 2: Time Intelligence */}
-            <div style={{ padding: '10px 15px', ...divider }}>
-              <p style={sectionHeader}>Time Window</p>
-              {/* API INTEGRATION: pass selected range to fetchHeatmap as hours param */}
-              <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
-                {TIME_RANGES.map(r => (
-                  <button key={r} onClick={() => { setTimeRange(r); setIsPlaying(false) }} style={{
-                    flex: 1, padding: '5px 0', borderRadius: 5, fontSize: 10, fontWeight: 700,
-                    cursor: 'pointer',
-                    border: `1px solid ${timeRange === r ? 'rgba(59,130,246,0.5)' : 'rgba(255,255,255,0.07)'}`,
-                    background: timeRange === r ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.03)',
-                    color: timeRange === r ? '#60a5fa' : '#475569', transition: 'all 0.15s',
-                  }}>
-                    {r}
-                  </button>
-                ))}
-                <button onClick={() => setIsPlaying(p => !p)} title={isPlaying ? 'Pause' : 'Animate'} style={{
-                  padding: '5px 8px', borderRadius: 5, fontSize: 11, cursor: 'pointer',
-                  border: `1px solid ${isPlaying ? 'rgba(239,68,68,0.45)' : 'rgba(255,255,255,0.07)'}`,
-                  background: isPlaying ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)',
-                  color: isPlaying ? '#ef4444' : '#475569',
-                }}>
-                  {isPlaying ? '⏸' : '▶'}
-                </button>
-              </div>
-              <p style={{ fontSize: 9, color: '#1e293b' }}>
-                {timeRange} · <span style={{ color: '#334155' }}>{vizMode === 'risk' ? 'Risk-weighted' : 'Raw volume'}</span>
-              </p>
-            </div>
-
-            {/* Active hotspots */}
-            <div style={{ padding: '10px 15px', ...divider }}>
-              <p style={sectionHeader}>Active Hotspots ({globeSpots.length})</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                {globeSpots.map(spot => (
-                  <div
-                    key={spot.label}
-                    onClick={() => setSelectedHotspot(prev => prev?.label === spot.label ? null : spot)}
-                    style={{
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      cursor: 'pointer', padding: '3px 5px', borderRadius: 4, transition: 'background 0.1s',
-                      background: selectedHotspot?.label === spot.label ? 'rgba(59,130,246,0.1)' : 'transparent',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
-                      <span style={{
-                        width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                        background: SEV[spot.severity].ring,
-                        boxShadow: `0 0 ${spot.isCoordinated || spot.isSpikeAnomaly ? '8px' : '4px'} ${SEV[spot.severity].ring}`,
-                      }} />
-                      <span style={{ fontSize: 11, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {spot.label}
-                      </span>
-                      {spot.isSpikeAnomaly && (
-                        <span style={{ fontSize: 7, padding: '1px 3px', borderRadius: 2, background: 'rgba(239,68,68,0.15)', color: '#ef4444', fontWeight: 700, flexShrink: 0 }}>↑</span>
-                      )}
-                      {spot.isCoordinated && (
-                        <span style={{ fontSize: 7, padding: '1px 3px', borderRadius: 2, background: 'rgba(245,158,11,0.15)', color: '#f59e0b', fontWeight: 700, flexShrink: 0 }}>⚡</span>
-                      )}
-                    </div>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: SEV[spot.severity].text, fontFamily: 'monospace', flexShrink: 0, marginLeft: 4 }}>
-                      {spot.displayCount.toLocaleString()}
-                    </span>
-                  </div>
-                ))}
-                {globeSpots.length === 0 && (
-                  <p style={{ fontSize: 10, color: '#1e293b' }}>No hotspots match this filter.</p>
-                )}
-              </div>
-            </div>
-
-            {/* Region activity bars */}
-            <div style={{ padding: '10px 15px', ...divider }}>
-              <p style={sectionHeader}>Region Activity</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {regions.map(r => (
-                  <div key={r.name}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                      <span style={{ fontSize: 10, color: '#475569' }}>{r.name}</span>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <span style={{ fontSize: 9, fontWeight: 700, color: SEV[r.severity].text }}>{r.events.toLocaleString()}</span>
-                        <span style={{ fontSize: 9, color: r.delta >= 0 ? '#ef4444' : '#10b981' }}>
-                          {r.delta >= 0 ? `+${r.delta}` : r.delta}%
-                        </span>
-                      </div>
-                    </div>
-                    <div style={{ height: 2, borderRadius: 1, background: 'rgba(255,255,255,0.05)' }}>
-                      <div style={{
-                        height: '100%', borderRadius: 1, background: SEV[r.severity].ring,
-                        width: `${Math.min(100, (r.events / 1300) * 100)}%`,
-                        boxShadow: `0 0 4px ${SEV[r.severity].ring}`, transition: 'width 0.7s ease',
-                      }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Feature 8: Alert Feed */}
-            <div style={{ padding: '10px 15px', ...divider }}>
-              {/* API INTEGRATION: GET /api/v1/alerts or WS /api/v1/alerts/stream */}
-              <p style={{ ...sectionHeader, color: '#ef4444' }}>⚠ Active Alerts ({MOCK_ALERTS.length})</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {MOCK_ALERTS.map(a => (
-                  <div key={a.id} style={{
-                    padding: '6px 8px', borderRadius: 5,
-                    background: a.sev === 'high' ? 'rgba(239,68,68,0.07)' : 'rgba(245,158,11,0.06)',
-                    border: `1px solid ${a.sev === 'high' ? 'rgba(239,68,68,0.18)' : 'rgba(245,158,11,0.18)'}`,
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-                      <span style={{ fontSize: 9, fontWeight: 800, color: a.sev === 'high' ? '#ef4444' : '#f59e0b', textTransform: 'uppercase' }}>
-                        {a.type === 'coordinated' ? '⚡ Coordinated' : '↑ Spike'}
-                      </span>
-                      <span style={{ fontSize: 9, color: '#1e293b' }}>{a.time}</span>
-                    </div>
-                    <p style={{ fontSize: 10, color: '#475569', lineHeight: 1.4 }}>{a.msg}</p>
-                    <p style={{ fontSize: 9, color: '#334155', marginTop: 2 }}>{a.city}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Feature 9: Location button */}
-            <div style={{ padding: '10px 15px', marginTop: 'auto' }}>
-              {/* API INTEGRATION: POST /api/v1/user/location { lat, lng } */}
-              <button onClick={enableLocation} style={{
-                width: '100%', padding: '7px 0', borderRadius: 6, fontSize: 10, fontWeight: 600,
-                cursor: 'pointer',
-                border: `1px solid ${userLocation ? 'rgba(16,185,129,0.35)' : 'rgba(59,130,246,0.25)'}`,
-                background: userLocation ? 'rgba(16,185,129,0.1)' : 'rgba(59,130,246,0.07)',
-                color: userLocation ? '#10b981' : '#60a5fa', transition: 'all 0.2s',
-              }}>
-                {userLocation ? '📍 Location Active — Refocus' : '📍 Focus My Location'}
-              </button>
-              {locationError && (
-                <p style={{ fontSize: 9, color: '#ef4444', marginTop: 4, textAlign: 'center' }}>{locationError}</p>
-              )}
-            </div>
-          </div>
-
+          <LeftControlPanel
+            liveFeed={liveFeed}
+            globeSpots={globeSpots}
+            selectedHotspot={selectedHotspot}
+            setSelectedHotspot={setSelectedHotspot}
+            regions={regions}
+            timeRange={timeRange}
+            setTimeRange={setTimeRange}
+            isPlaying={isPlaying}
+            setIsPlaying={setIsPlaying}
+            vizMode={vizMode}
+            userLocation={userLocation}
+            enableLocation={enableLocation}
+            locationError={locationError}
+          />
           {/* ════ CENTER: Globe ════ */}
           <div ref={mapRef} style={{ flex: 1, position: 'relative', overflow: 'hidden', background: '#020509', minWidth: 0 }}>
 
@@ -962,252 +647,23 @@ export default function Heatmap() {
             }}>
               Drag to rotate · Scroll to zoom<br />Click point for details
             </div>
+
+            {/* Simulation result overlay — pure HTML, does not touch Globe internals */}
+            <GlobeOverlayLayer />
           </div>
 
           {/* ════ RIGHT PANEL ════ */}
-          <div style={{
-            width: 300, flexShrink: 0, display: 'flex', flexDirection: 'column',
-            borderLeft: '1px solid rgba(255,255,255,0.07)', overflowY: 'auto', ...panelBg,
-          }}>
-            <div style={{
-              padding: '9px 15px', ...divider,
-              fontSize: 10, fontWeight: 700, color: '#3b82f6',
-              letterSpacing: '0.1em', textTransform: 'uppercase',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            }}>
-              <span>Intelligence Panel</span>
-              {multiCats.size > 0 && (
-                <span style={{ fontSize: 9, color: '#3b82f6', background: 'rgba(59,130,246,0.12)', padding: '2px 6px', borderRadius: 3 }}>
-                  {multiCats.size} filter{multiCats.size > 1 ? 's' : ''}
-                </span>
-              )}
-            </div>
-
-            {/* Feature 5: Hotspot Detection Panel */}
-            {selectedHotspot && (
-              <div style={{
-                margin: '10px 12px 0',
-                padding: '10px 12px', borderRadius: 8,
-                background: 'rgba(20,30,50,0.6)',
-                border: `1px solid ${SEV[selectedHotspot.severity].ring}40`,
-              }}>
-                {/* Header */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3 }}>
-                      <span style={{ fontSize: 13, fontWeight: 800, color: '#e2e8f0' }}>{selectedHotspot.label}</span>
-                      <span style={{
-                        fontSize: 9, padding: '2px 6px', borderRadius: 3, fontWeight: 700,
-                        background: `${SEV[selectedHotspot.severity].ring}20`,
-                        color: SEV[selectedHotspot.severity].ring,
-                      }}>
-                        {selectedHotspot.severity.toUpperCase()}
-                      </span>
-                    </div>
-                    <span style={{ fontSize: 9, color: '#334155' }}>{selectedHotspot.category}</span>
-                  </div>
-                  <button onClick={() => { setSelectedHotspot(null); setSimResult(null) }} style={{
-                    background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontSize: 16, lineHeight: 1,
-                  }}>×</button>
-                </div>
-
-                {/* Score cards */}
-                <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                  {[
-                    { label: 'Confidence', value: `${Math.round((selectedHotspot.confidence_score ?? 0) * 100)}%`, color: '#60a5fa' },
-                    { label: 'Virality',   value: `${(selectedHotspot.virality_score ?? 0).toFixed(1)}×`,         color: '#f59e0b' },
-                    {
-                      label: 'Trend',
-                      value: selectedHotspot.trend === 'up' ? '↑' : selectedHotspot.trend === 'down' ? '↓' : '–',
-                      color: selectedHotspot.trend === 'up' ? '#ef4444' : selectedHotspot.trend === 'down' ? '#10b981' : '#475569',
-                    },
-                  ].map(s => (
-                    <div key={s.label} style={{ flex: 1, background: 'rgba(255,255,255,0.04)', borderRadius: 5, padding: '5px 0', textAlign: 'center' }}>
-                      <p style={{ fontSize: 8, color: '#334155', marginBottom: 2, textTransform: 'uppercase' }}>{s.label}</p>
-                      <p style={{ fontSize: 15, fontWeight: 900, color: s.color, lineHeight: 1 }}>{s.value}</p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Alert flags */}
-                {(selectedHotspot.isCoordinated || selectedHotspot.isSpikeAnomaly) && (
-                  <div style={{ display: 'flex', gap: 5, marginBottom: 8, flexWrap: 'wrap' }}>
-                    {selectedHotspot.isCoordinated && (
-                      <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 3, background: 'rgba(245,158,11,0.12)', color: '#f59e0b', fontWeight: 700 }}>
-                        ⚡ Coordinated Activity
-                      </span>
-                    )}
-                    {selectedHotspot.isSpikeAnomaly && (
-                      <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 3, background: 'rgba(239,68,68,0.12)', color: '#ef4444', fontWeight: 700 }}>
-                        ↑ Spike Anomaly
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {/* Platform breakdown — API: GET /api/v1/heatmap/hotspot/{id}/platforms */}
-                {selectedHotspot.platforms && (
-                  <div style={{ marginBottom: 9 }}>
-                    <p style={{ ...sectionHeader, marginBottom: 5 }}>Platform Spread</p>
-                    {selectedHotspot.platforms.map(p => (
-                      <div key={p.name} style={{ marginBottom: 5 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-                          <span style={{ fontSize: 9, color: '#475569' }}>{p.name}</span>
-                          <span style={{ fontSize: 9, color: '#334155', fontFamily: 'monospace' }}>{p.pct}%</span>
-                        </div>
-                        <div style={{ height: 2, borderRadius: 1, background: 'rgba(255,255,255,0.05)' }}>
-                          <div style={{ height: '100%', borderRadius: 1, width: `${p.pct}%`, background: '#3b82f6', transition: 'width 0.5s' }} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Top claims — API: GET /api/v1/heatmap/hotspot/{id}/claims */}
-                {selectedHotspot.topClaims && (
-                  <div style={{ marginBottom: 9 }}>
-                    <p style={{ ...sectionHeader, marginBottom: 5 }}>Top Claims</p>
-                    {selectedHotspot.topClaims.map((claim, i) => (
-                      <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 5 }}>
-                        <span style={{ fontSize: 9, color: '#3b82f6', fontFamily: 'monospace', flexShrink: 0 }}>0{i + 1}</span>
-                        <p style={{ fontSize: 10, color: '#475569', lineHeight: 1.4 }}>{claim}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Time breakdown — API: GET /api/v1/heatmap/hotspot/{id}?breakdown=time */}
-                {selectedHotspot.timeData && (
-                  <div style={{ display: 'flex', gap: 5, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    {TIME_RANGES.map(r => (
-                      <div key={r} style={{
-                        flex: 1, textAlign: 'center', borderRadius: 4, padding: '4px 0',
-                        background: timeRange === r ? 'rgba(59,130,246,0.12)' : 'rgba(255,255,255,0.03)',
-                        border: `1px solid ${timeRange === r ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.05)'}`,
-                      }}>
-                        <p style={{ fontSize: 7, color: '#334155', textTransform: 'uppercase', marginBottom: 2 }}>{r}</p>
-                        <p style={{ fontSize: 11, fontWeight: 700, color: timeRange === r ? '#60a5fa' : '#475569', fontFamily: 'monospace' }}>
-                          {(selectedHotspot.timeData[r] ?? 0).toLocaleString()}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Feature 11: Simulation result */}
-                {simResult && (
-                  <div style={{ padding: '7px 0 4px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <p style={{ ...sectionHeader, marginBottom: 5, color: '#10b981' }}>Simulation Result</p>
-                    <p style={{ fontSize: 9, color: '#334155', marginBottom: 4 }}>
-                      Confidence: <span style={{ color: '#60a5fa', fontWeight: 700 }}>{Math.round((simResult.confidence ?? 0) * 100)}%</span>
-                      {' · '}Model: <span style={{ color: '#475569' }}>{simResult.model ?? 'velocity-diffusion'}</span>
-                    </p>
-                    {simResult.projected_spread?.map((p, i) => (
-                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                        <span style={{ fontSize: 9, color: '#475569' }}>→ {p.city}</span>
-                        <span style={{ fontSize: 9, color: '#10b981', fontFamily: 'monospace', fontWeight: 700 }}>
-                          ~{(p.projectedCount ?? 0).toLocaleString()} events
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Feature 11: Action buttons */}
-                <div style={{ display: 'flex', gap: 6, paddingTop: 8 }}>
-                  <button onClick={trackNarrative} style={{
-                    flex: 1, padding: '6px 0', borderRadius: 5, fontSize: 9, fontWeight: 700,
-                    cursor: 'pointer', border: '1px solid rgba(59,130,246,0.3)',
-                    background: 'rgba(59,130,246,0.08)', color: '#60a5fa', transition: 'all 0.15s',
-                  }}>
-                    ↗ Track Globally
-                  </button>
-                  <button onClick={handleRunSimulation} disabled={simulationRunning} style={{
-                    flex: 1, padding: '6px 0', borderRadius: 5, fontSize: 9, fontWeight: 700,
-                    cursor: simulationRunning ? 'wait' : 'pointer',
-                    border: `1px solid ${simulationRunning ? 'rgba(245,158,11,0.4)' : 'rgba(16,185,129,0.3)'}`,
-                    background: simulationRunning ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.07)',
-                    color: simulationRunning ? '#f59e0b' : '#10b981', transition: 'all 0.15s',
-                  }}>
-                    {simulationRunning ? '⏳ Simulating…' : '▶ Simulate'}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Feature 3: Multi-select category filter */}
-            <div style={{ padding: '11px 15px', ...divider }}>
-              <p style={sectionHeader}>Category Filter</p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                {CATEGORIES.map(c => (
-                  <button key={c} onClick={() => toggleCat(c)} style={{
-                    padding: '4px 10px', borderRadius: 5, fontSize: 10, fontWeight: 600,
-                    cursor: 'pointer', transition: 'all 0.15s',
-                    background: catActive(c) ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.04)',
-                    color: catActive(c) ? '#60a5fa' : '#475569',
-                    border: `1px solid ${catActive(c) ? 'rgba(59,130,246,0.4)' : 'rgba(255,255,255,0.06)'}`,
-                    outline: 'none',
-                  }}>
-                    {c}
-                  </button>
-                ))}
-              </div>
-              {multiCats.size > 0 && (
-                <p style={{ fontSize: 9, color: '#334155', marginTop: 6 }}>
-                  Click active filters to deselect · &quot;All&quot; clears all
-                </p>
-              )}
-            </div>
-
-            {/* Trending narratives */}
-            <div style={{ padding: '11px 15px', flex: 1 }}>
-              <p style={sectionHeader}>Trending Narratives</p>
-              {filteredNarratives.length === 0 ? (
-                <p style={{ fontSize: 11, color: '#1e293b', padding: '24px 0', textAlign: 'center' }}>
-                  No narratives in this category.
-                </p>
-              ) : filteredNarratives.map(n => (
-                <div key={n.rank} style={{
-                  padding: '9px 0', borderBottom: '1px solid rgba(255,255,255,0.04)',
-                  display: 'flex', gap: 10, alignItems: 'flex-start',
-                }}>
-                  <span style={{ fontSize: 10, color: '#1e293b', fontFamily: 'monospace', flexShrink: 0, width: 14, paddingTop: 1 }}>
-                    {n.rank}
-                  </span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: 11, color: '#64748b', lineHeight: 1.45, marginBottom: 5 }}>{n.title}</p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                      <span style={{
-                        fontSize: 9, padding: '1px 6px', borderRadius: 3,
-                        background: 'rgba(255,255,255,0.04)', color: '#334155',
-                        border: '1px solid rgba(255,255,255,0.06)',
-                      }}>
-                        {n.category}
-                      </span>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: '#334155', fontFamily: 'monospace' }}>
-                        {(n.volume / 1000).toFixed(1)}k
-                      </span>
-                      <span style={{
-                        fontSize: 12, fontWeight: 700,
-                        color: n.trend === 'up' ? '#ef4444' : n.trend === 'down' ? '#10b981' : '#334155',
-                      }}>
-                        {n.trend === 'up' ? '↑' : n.trend === 'down' ? '↓' : '–'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Footer */}
-            <div style={{ padding: '9px 15px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-              <p style={{ fontSize: 9, color: '#1e293b', textAlign: 'center', lineHeight: 1.7 }}>
-                MongoDB Atlas · Change Streams · 30 s refresh
-              </p>
-            </div>
-          </div>
-
-        </div>{/* end 3-column */}
+          <RightSimulationPanel
+            selectedHotspot={selectedHotspot}
+            setSelectedHotspot={setSelectedHotspot}
+            multiCats={multiCats}
+            toggleCat={toggleCat}
+            catActive={catActive}
+            filteredNarratives={filteredNarratives}
+            timeRange={timeRange}
+            setMultiCats={setMultiCats}
+          />
+                </div>{/* end 3-column */}
 
         {/* ════════════════ BOTTOM: LIVE AI FEED ════════════════ */}
         <div style={{
@@ -1289,5 +745,6 @@ export default function Heatmap() {
 
       </div>{/* end main content */}
     </div>
+    </SimulationProvider>
   )
 }
